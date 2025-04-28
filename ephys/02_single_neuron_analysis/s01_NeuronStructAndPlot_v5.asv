@@ -6,8 +6,8 @@ person = 'teresa';
 %person = 'simon';
 if strcmp(person,'teresa')
     behavior_root ='D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\data\TD\behavior_data\raw_data';
-    ephys_root = 'E:'; %group_ephys = '20230801_ChocolateGroup';
-    %ephys_root = 'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\2_Lindt\';
+    %ephys_root = 'E:'; %group_ephys = '20230801_ChocolateGroup';
+    ephys_root = 'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\2_Lindt\';
     %ephys_root = 'G:\ePhys\'; %group_ephys = '20230801_ChocolateGroup';
 elseif strcmp(person,'simon')
     behavior_root ='D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\data\TD\behavior_data\raw_data';
@@ -22,24 +22,24 @@ animals = {...
     'Toblerone',...
     'Milka',...
     'FerreroRocher'};
-animal_idx = 4;
+animal_idx = 2;
 mouse = sprintf('%i_%s',animal_idx,animals{animal_idx});
 %ephys_root = strcat(ephys_root,filesep,mouse);
 
-paw_pref = 'right';
+paw_pref = 'left';
 session = 'R4';
-ephys_sess = '18082023_Milka_StrCer_S4_g0';
+ephys_sess = '26082023_Lindt_StrCer_S4_g0';
 imec_id = 0;
 
 %catGT_folder = 'catGT_KS_DSRemoved';
 sorter_folder = 'catGT\kilosort4';
 %sorter_folder = 'ibl_sorter_results_default';
-output_folder_name = 'neurons_overview_postFinal';
+output_folder_name = 'neurons_overview_post_needsNoCorr';
 
 % To run / save
-show_aux_plots = 0;
+show_aux_plots = 1;
 save_mat_flag = 1;
-plot_neuron_fig = 0;
+plot_neuron_fig = 1;
 use_inferred_reach_times = 0;
 
 % Probe side: BG or CB

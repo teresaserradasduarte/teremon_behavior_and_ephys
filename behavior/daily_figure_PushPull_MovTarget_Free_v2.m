@@ -18,20 +18,20 @@ animals = {...
     'Toblerone',...
     'Milka',...
     'FerreroRocher'};
-animal_idx = 5;
+animal_idx = 2;
 mouse = sprintf('%i_%s',animal_idx,animals{animal_idx});
 % R:-1 |C:0 | L:1
 
         
 % SESSION
-session = 'R6';
-flag_no_sync = 0;
+session = 'R4';
+flag_no_sync = 1;
 
 % DISPLAY LENGTH
 % Sherten session to display (discart unengaged trials)
 shorten_display = 1;
-last_trial_disp_time = 18; % minutes
-%last_trial_disp = 95; % trial idx
+%last_trial_disp_time = 18; % minutes
+last_trial_disp = 190; % trial idx
 
 %% Path
 %session = char(PP_sess(s));
@@ -574,7 +574,7 @@ sum_gen_force_init_early=nansum(abs(paw_ITI_play(1:3000,:)));
 close all
 % Figures handles
 figOpt = {'color','w','position',[1921          46        1920         963]};
-axeOpt = {'linewidth',1.5,'box','off','GridAlpha',0.05,'ticklength',[1,1]*.01,'fontsize',12};
+axeOpt = {'linewidth',1.5,'box','off','GridAlpha',0.05,'ticklength',[1,1]*.01,'fontsize',12, 'TickDir','out'};
 
 % Colors, lines and sizes: fig properties
 push_clr = [132 160 124]./256;
@@ -653,8 +653,8 @@ plot(trials_vec,time_to_reach,'color',[.8 .8 .8 transp])
 hold on
 if flag_realigned_rwd
     %plot(trials_vec,time_to_reach,'b.');
-    plot(trials_vec,time_to_reach_corrected,'b.','color',[0.8 0.8 0.8]);
-    plot(trials_vec(idx_reach_syncfix),time_to_reach_inferred,'.','color',[0.5 0.5 0.5]);
+    %plot(trials_vec,time_to_reach_corrected,'b.','color',[0.8 0.8 0.8]);
+    %plot(trials_vec(idx_reach_syncfix),time_to_reach_inferred,'.','color',[0.5 0.5 0.5]);
     %plot(trials_vec(idx_reach_syncfix),time_to_reach_inferred_approxlog,'r.');
     plot(trials_vec(idx_reach_syncfix),time_to_reach_inferred_approxlog_corrected,'k.');
 else
@@ -762,7 +762,8 @@ save_path = rootdir;
 eps_file = fullfile(save_path,[file_name,'.eps']);
 png_file = fullfile(save_path,[file_name,'.png']);
 saveas(fig_performance,png_file,'png');
-print(fig_performance,eps_file,'-depsc','-painters','-loose');
+%print(fig_performance,eps_file,'-depsc','-painters','-loose');
+print(fig_performance, fullfile(save_path, [file_name,'.pdf']), '-dpdf', '-painters');
 
 
 %% Techincal(ish) figure
@@ -874,6 +875,7 @@ behavior.logs.reached_really_ind = reached_really_ind;
 behavior.logs.ITIs_start_ind = ITIs_start_ind;
 behavior.logs.manual_water_ind = manual_water_ind;
 behavior.logs.sess_start_ind = sess_start_ind;
+behavior.logs.water_delivered_ind = water_delivered_ind;
 
 % sync
 behavior.sync.time_newTrial_log = time_newTrial_log;
@@ -965,6 +967,6 @@ behavior.colors.right_color = right_color;
 behavior.colors.center_color = center_color;
 behavior.colors.left_color = left_color;
 
-save(strcat(rootdir,filesep,'behavior_session.mat'),'behavior');
+%save(strcat(rootdir,filesep,'behavior_session.mat'),'behavior');
 
 
