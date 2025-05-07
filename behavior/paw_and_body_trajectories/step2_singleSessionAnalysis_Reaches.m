@@ -14,8 +14,8 @@ out_folder = 'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\
 
 group = '20230511_ChocolateGroup';
 setup = 'headfixed_dynamicTarget';
-mouse = '4_Milka';
-sess = 'R4';
+mouse = '5_FerreroRocher';
+sess = 'R1';
 save_flag = false;
 
 % Normalize reaches position
@@ -368,7 +368,7 @@ xline(tm(start_mod2),'--','linewidth',2,'Color',[0.9 0.9 0.9 0.1])
 hold off
 xlabel('time (sec)'); ylabel('distance (mm)')
 title('distance to water');
-xlim([tm(1),tm(end)]); ylim([18 45])
+xlim([tm(1),tm(end)]); ylim([10 45])
 axis square
 set(gca,axeOpt{:});
 

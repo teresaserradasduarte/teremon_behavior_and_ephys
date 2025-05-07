@@ -1,6 +1,8 @@
 %% SESSION ANALYSIS - Detecting reaches
 clear; close all; clc
 
+
+
 %% FOLDER ORGANIZATION
 raw_folder = 'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\behavior_data\raw_data';
 mat_folder = 'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\behavior_data\analyzed_data\mat_files';
@@ -14,19 +16,25 @@ animals = {...
     'Toblerone',...
     'Milka',...
     'FerreroRocher'};
-animal_idx = 4;
+animal_idx = 1;
 mouse = sprintf('%i_%s',animal_idx,animals{animal_idx});
-session_range = ['R4'];
+session_range = ['R6'];
 
 % Mouse paw preference
 % R -> righties | L-> Lefties
 phenotype = 'CTR';
-paw_pref = 'R';
+if ismember(animal_idx,[1,4,5])
+    paw_pref = 'R';
+elseif ismember(animal_idx,[2,3])
+    paw_pref = 'L';
+else
+    print('unknown paw pref');
+end
 
 % Display and save
 show_plot = false;
-show_overview_reach_plot = true;
-save_fig_flag = true;
+show_overview_reach_plot = false;
+save_fig_flag = false;
 
 % Mouse info to save
 mouse_info.group = group;
@@ -661,8 +669,8 @@ clr_inval = [.5 .5 .5];
 % TRIAL LOOP
 disp('Finding reaches...')
 
-tt=2
-%for tt = 1:n_trials
+%tt=2
+for tt = 1:n_trials
     disp(strcat('trial ',num2str(tt)))
 
     real_tt = tt-1;
@@ -845,8 +853,8 @@ tt=2
     if nreaches_trial == 0
         disp(strcat('no reaches in trial',num2str(tt)))
     else
-        %for r_ind = 1:nreaches_trial
-            r_ind=4
+        for r_ind = 1:nreaches_trial
+            %r_ind=4
             % reach max rame
             rr=xmax_frame(r_ind);
             nn_max_points_tt = siz(tt);
@@ -1568,8 +1576,8 @@ tt=2
             nonDomPaw_resting = cat(1,nonDomPaw_resting,is_nonDomPaw_resting);
 
         end % end of if there are reaches in trial
-    %end % end of reach loop
-%end % end trial loop
+    end % end of reach loop
+end % end trial loop
 
 
 %% SAVE VARIABLES

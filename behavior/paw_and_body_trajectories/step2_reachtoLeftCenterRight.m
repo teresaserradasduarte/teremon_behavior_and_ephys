@@ -11,9 +11,9 @@ animals = {...
     'Toblerone',...
     'Milka',...
     'FerreroRocher'};
-animal_idx = 4;
+animal_idx = 5;
 mouse = sprintf('%i_%s',animal_idx,animals{animal_idx});
-sess = 'R4';
+sess = 'R1';
 
 % All reaches or only aligned to spikes
 ephys_win_only_flag = 1;
@@ -166,7 +166,7 @@ transp_mean_proj = 1;
 mean_p_lw = 2;
 trial_lw = 2;
 origin = [0, 0, 0];
-axis_xyz = [5 32 0 23 0 20];
+axis_xyz = [5 35 0 23 0 25];
 sz = 50;
 max_reach = reaches.reach_params.reach_interval.max_reach;
 

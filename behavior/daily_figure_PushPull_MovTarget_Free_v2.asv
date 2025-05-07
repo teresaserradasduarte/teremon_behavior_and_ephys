@@ -18,20 +18,20 @@ animals = {...
     'Toblerone',...
     'Milka',...
     'FerreroRocher'};
-animal_idx = 4;
+animal_idx = 1;
 mouse = sprintf('%i_%s',animal_idx,animals{animal_idx});
 % R:-1 |C:0 | L:1
 
         
 % SESSION
-session = 'R3';
+session = 'R5';
 flag_no_sync = 0;
 
 % DISPLAY LENGTH
 % Sherten session to display (discart unengaged trials)
 shorten_display = 0;
-%last_trial_disp_time = 38; % minutes
-last_trial_disp = 131; % trial idx
+last_trial_disp_time = 35; % minutes
+%last_trial_disp = 120; % trial idx
 
 %% Path
 %session = char(PP_sess(s));
@@ -43,7 +43,7 @@ searchstr_log = '*GlobalLogInt';
 searchstr_load_cells = '*paws_loadCells';
 searchstr_cam = '*Camera1Timestamp';
 searchstr_water_pos = '*WaterPosition_steps';
-searchstr_syncfix = '*syncfixNO'; % remove the NO if what to use
+searchstr_syncfix = '*syncfix';
 
 
 % Files
@@ -370,7 +370,6 @@ end
 
 
 % Time of valid/invalid push pull
-idx_comp_trial_push = idx_comp_trial_push<length(init_time);
 valPush_time = init_time(idx_comp_trial_push);
 valPull_time = init_time(idx_comp_trial_pull);
 invalPush_time = timelog(inval_push_ind);
@@ -385,7 +384,6 @@ end
 
 %% Time (duration) to...
 % Time to reach/init/iti (durations)
-trial_available_time = trial_available_time(1:length(init_time));
 time_to_init = init_time-trial_available_time;
 time_to_reach = reach_time-water_delivery_time;
 time_to_reach_corrected = reach_time_corrected - water_delivery_time;

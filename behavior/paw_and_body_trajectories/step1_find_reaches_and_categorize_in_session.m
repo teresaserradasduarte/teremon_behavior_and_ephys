@@ -14,14 +14,20 @@ animals = {...
     'Toblerone',...
     'Milka',...
     'FerreroRocher'};
-animal_idx = 4;
+animal_idx = 1;
 mouse = sprintf('%i_%s',animal_idx,animals{animal_idx});
-session_range = ['R4'];
+session_range = ['R6'];
 
 % Mouse paw preference
 % R -> righties | L-> Lefties
 phenotype = 'CTR';
-paw_pref = 'R';
+if ismember(animal_idx,[1,4,5])
+    paw_pref = 'R';
+elseif ismember(animal_idx,[2,3])
+    paw_pref = 'L';
+else
+    print('unknown paw pref');
+end
 
 % Display and save
 show_plot = false;

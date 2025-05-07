@@ -13,21 +13,21 @@ animals = {...
     'Toblerone',...
     'Milka',...
     'FerreroRocher'};
-animal_idx = 2;
+animal_idx = 5;
 mouse = sprintf('%i_%s',animal_idx,animals{animal_idx});
 
 %% Session & ephys source
-sess = 'R4';
-imec_id = 0;
-ephys_sess = '18082023_Milka_StrCer_S4_g0';
+sess = 'R1';
+imec_id = 1;
+ephys_sess = '15082023_Ferrero_StrCer_S1_g0';
 sorter_folder = 'catGT\kilosort4';
 ephys_local_folder = false;
 flag_plot_rasters = true;
 flag_save_behavior_funda = true;
 
 %% Depth cortex 
-depth_cortex_lim = nan; %2000;
-depthLim_phyID = 88; %363;
+depth_cortex_lim = nan; %65.1348;
+depthLim_phyID = 226;
 
 
 %% paths
@@ -35,11 +35,13 @@ rootdir = 'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Dat
 if ephys_local_folder==1, ephys_root = 'E:\';
 else, ephys_root = fullfile(rootdir,"ephys_data",group,mouse); end
 behavior_dir = fullfile(rootdir,"behavior_data","raw_data",group_behav,setup,mouse,sess);
+bhv_dir = fullfile(rootdir,"ephys_and_behavior","mat_files",group,mouse,sess);
 reaching_dir = fullfile(rootdir,"behavior_data","analyzed_data","mat_files",group_behav,setup,mouse,sess);
 ephys_dir = fullfile(ephys_root,ephys_sess,strcat(ephys_sess,'_imec',num2str(imec_id)),sorter_folder);
 
 % Load mat files
 load(fullfile(behavior_dir,"behavior_session.mat"));
+
 load(fullfile(reaching_dir,"session_reaching_data_paw.mat"));
 load(fullfile(ephys_dir,"neurons_session.mat"));
 
@@ -145,7 +147,7 @@ time_sess_end = behavior.behavior_duration.time_start+behavior.behavior_duration
 initiation_times = initiation_times_all(initiation_times_all<time_sess_end);
 inva_push_times = inva_push_times_all(inva_push_times_all<time_sess_end);
 inva_pull_times = inva_pull_times_all(inva_pull_times_all<time_sess_end);
-pp_times = cat(1,initiation_times,inva_pull_times);
+pp_times = cat(1,initiation_times,inva_push_times,inva_pull_times);
 init_invPush_invPull_idx = cat(1,ones(length(initiation_times),1),...
     ones(length(inva_push_times),1)*2,ones(length(inva_pull_times),1)*3);
 nr_pp_events = length(pp_times);
@@ -194,6 +196,7 @@ end
 %% Sanity check - reaches keep their identities
 figure
 plot(squeeze(reaches_inVec_px(:,1,hit_inVec==1)))
+%plot(squeeze(reaches_inVec_px(:,1,cat_reach_inVec==1)))
 
 %% Align to events
 win_interest = [-3 3];
@@ -261,7 +264,7 @@ for i = 1:n_eg
         figProp.ticks_y = trialsIdx;
         figProp.y_name = 'trial idx across session';
         plot_init_raster_and_psth(eg_neurons,i,bin_edges,win_interest,figProp,trialsIdx)
-        saveas(gcf,fullfile(save_out_init,['neu',num2str(eg_neurons(i).phyID),'_reach.png']),'png');
+        saveas(gcf,fullfile(save_out_init,['neu',num2str(eg_neurons(i).phyID),'_init.png']),'png');
     end
 end
 toc

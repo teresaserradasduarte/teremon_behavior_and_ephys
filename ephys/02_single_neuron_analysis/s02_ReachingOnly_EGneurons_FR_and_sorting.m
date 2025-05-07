@@ -11,20 +11,19 @@ animals = {...
     'Toblerone',...
     'Milka',...
     'FerreroRocher'};
-animal_idx = 4;
+animal_idx = 5;
 mouse = sprintf('%i_%s',animal_idx,animals{animal_idx});
 
 %% Session & ephys source
-sess = 'R4';
-imec_id = 1;
-ephys_sess = '18082023_Milka_StrCer_S4_g0';
+sess = 'R1';
+imec_id = 0;
+ephys_sess = '15082023_Ferrero_StrCer_S1_g0';
 sorter_folder = 'catGT\kilosort4';
 ephys_local_folder = 1;
 
 %% Depth cortex 
-depth_cortex_lim = nan;
-%depth_cortex_lim = 2000;
-depthLim_phyID = 363;
+%depth_cortex_lim = nan;
+depthLim_phyID = 51;
 
 %% paths
 rootdir = 'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD';
