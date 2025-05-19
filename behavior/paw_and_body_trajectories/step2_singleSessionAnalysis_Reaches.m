@@ -14,9 +14,16 @@ out_folder = 'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\
 
 group = '20230511_ChocolateGroup';
 setup = 'headfixed_dynamicTarget';
-mouse = '5_FerreroRocher';
-sess = 'R1';
-save_flag = false;
+animals = {...
+    'CoteDor',...
+    'Lindt',...
+    'Toblerone',...
+    'Milka',...
+    'FerreroRocher'};
+animal_idx = 3;
+mouse = sprintf('%i_%s',animal_idx,animals{animal_idx});
+sess = 'R3';
+save_flag = true;
 
 % Normalize reaches position
 % 1 - origin is position of water

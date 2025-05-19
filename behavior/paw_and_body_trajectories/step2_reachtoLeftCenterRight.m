@@ -11,9 +11,9 @@ animals = {...
     'Toblerone',...
     'Milka',...
     'FerreroRocher'};
-animal_idx = 5;
+animal_idx = 3;
 mouse = sprintf('%i_%s',animal_idx,animals{animal_idx});
-sess = 'R1';
+sess = 'R3';
 
 % All reaches or only aligned to spikes
 ephys_win_only_flag = 1;
@@ -30,7 +30,7 @@ load(fullfile(reaching_dir,"session_reaching_data_paw.mat"));
 % Save output
 save_name = 'targets_reaching';
 save_mat = fullfile(rootdir,"behavior_data","analyzed_data","mat_files",group,setup,mouse,sess);
-save_out = fullfile(rootdir,"behavior_data","analyzed_data","out_files",group,setup,mouse,sess,save_name);
+save_out = fullfile(rootdir,"behavior_data","analyzed_data","output_files",group,setup,mouse,sess,save_name);
 if ~exist(save_mat,"dir"), mkdir(save_mat); end
 if ~exist(save_out,"dir"), mkdir(save_out); end
 
@@ -166,7 +166,7 @@ transp_mean_proj = 1;
 mean_p_lw = 2;
 trial_lw = 2;
 origin = [0, 0, 0];
-axis_xyz = [5 35 0 23 0 25];
+axis_xyz = [5 35 0 32 0 25];
 sz = 50;
 max_reach = reaches.reach_params.reach_interval.max_reach;
 

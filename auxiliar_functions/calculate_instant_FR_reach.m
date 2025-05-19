@@ -1,4 +1,4 @@
-    
+
 function [eg_neurons,FR_reach_raw] = calculate_instant_FR_reach(eg_neurons,i,event_tm,win_padded,bin_width)
 
 % Dimensions of FR matrix
@@ -38,9 +38,13 @@ for j = 1:n_reach_inVec
 
         % find the spike after the interval for final ISI
         last_spk_idx=find(spike_reach_flags,1,'last');
+        if last_spk_idx==length(eg_neurons(i).st)
+            FR_reach_raw(bin_edges_padded>reach_spikes(end),j) = 0;
+        else
         finish_instant_isi = eg_neurons(i).st(last_spk_idx+1) - ...
             eg_neurons(i).st(last_spk_idx);
         FR_reach_raw(bin_edges_padded>reach_spikes(end),j) = 1/finish_instant_isi;
+        end
     end
 end
 end

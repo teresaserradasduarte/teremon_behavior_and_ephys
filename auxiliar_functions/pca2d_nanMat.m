@@ -23,6 +23,7 @@ end
 score_PCs = score_M(:, 1:n_components); % (1600 x n_components)
 score_2d = reshape(score_PCs, size(mat_stack,1), size(mat_stack,2), n_components);
 pc_score_mat = score_2d;
+
 pc_score_mat(repmat(nan_positions(:,1),[1 n_components])) = NaN;
  
 end

@@ -33,8 +33,8 @@ function plot_reach_raster_and_psth(eg_neurons,i,bin_edges,win_interest,figProp,
     xlabel('time from reack peak (s)');
     set(gca,figProp.axeOpt{:})
     xlim(win_interest)
-    set(gcf,'Position',[2157 205 539 697],'Color','w')
-   
+    set(gcf,'position',[2621 207 539 697],'Color','w')
+
     yticks_to_label = round(linspace(1, length(trialsIdx), 10));
     ytick_labels = figProp.ticks_y(yticks_to_label);
     ylim([1 length(trialsIdx)])

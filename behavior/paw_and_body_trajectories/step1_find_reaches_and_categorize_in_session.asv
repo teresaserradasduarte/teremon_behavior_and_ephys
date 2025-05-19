@@ -1,8 +1,6 @@
 %% SESSION ANALYSIS - Detecting reaches
 clear; close all; clc
-
-
-
+    
 %% FOLDER ORGANIZATION
 raw_folder = 'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\behavior_data\raw_data';
 mat_folder = 'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\behavior_data\analyzed_data\mat_files';
@@ -16,9 +14,9 @@ animals = {...
     'Toblerone',...
     'Milka',...
     'FerreroRocher'};
-animal_idx = 1;
+animal_idx = 3;
 mouse = sprintf('%i_%s',animal_idx,animals{animal_idx});
-session_range = ['R6'];
+session_range = 'R6';
 
 % Mouse paw preference
 % R -> righties | L-> Lefties
@@ -34,7 +32,7 @@ end
 % Display and save
 show_plot = false;
 show_overview_reach_plot = false;
-save_fig_flag = false;
+save_fig_flag = true;
 
 % Mouse info to save
 mouse_info.group = group;
@@ -117,7 +115,10 @@ if  exist(strcat(char(folders.mat),filesep,'session_raw_data_paw',paw_pref,'.mat
         tmp_camA=csvread(tmp_camA_csv,3,1);
         siz(i)=size(tmp_camA,1);
     end
-    [max_siz, max_siz_loc]=max(siz); % Check max size to define the mat length
+    % Check max size to define the mat length
+    if (siz(1)>7*frame_rate*60), start_trials = 2;
+    else, start_trials = 1; end   
+    [max_siz, max_siz_loc]=max(siz(start_trials:end)); 
     disp(strcat('Done: max= ',num2str(max_siz)))
 
     % Allocate space
@@ -136,7 +137,7 @@ if  exist(strcat(char(folders.mat),filesep,'session_raw_data_paw',paw_pref,'.mat
     camA_in_row = [];
     camB_in_row = [];
     camC_in_row = [];
-    for i=1:n_trials % to ensure cronologinal ordering
+    for i=start_trials:n_trials % to ensure cronologinal ordering
         % cam A
         tmp_camA_csv = strcat(folders.raw, filesep,sess,'-camA-trial',num2str(i),resnet,'.csv');
         tmp_camA=csvread(tmp_camA_csv,3,1);
@@ -269,7 +270,7 @@ if  exist(strcat(char(folders.mat),filesep,'session_raw_data_paw',paw_pref,'.mat
     % Save
     mkdir(char(folders.mat))
     save(strcat(char(folders.mat),filesep,'session_raw_data_paw',paw_pref,'.mat'),...
-        'folders','resnet', 'paw_pref', ...
+        'folders','resnet', 'paw_pref', 'start_trials',...
         'width','height','likelihood_threshold','frame_rate','T','px2mm_xz','px2mm_y','offset_c2a','n_max_points', ...
         'csvs', 'n_trials', 'siz', 'max_siz', 'camA', 'camB', 'camC',...
         'camA_in_row', 'camB_in_row', 'camC_in_row',...
@@ -283,7 +284,7 @@ if  exist(strcat(char(folders.mat),filesep,'session_raw_data_paw',paw_pref,'.mat
     mkdir(char(folders.out))
 
     if show_plot
-        tt=50; % example trial
+        tt=6; % example trial
         figure%(1)
         subplot(311)
         plot(pawR(:,1,tt)); hold on
@@ -348,9 +349,13 @@ else
     load(strcat(char(folders.mat),filesep,'session_raw_data_paw',paw_pref,'.mat'),...
         'paw_pref','width','height','frame_rate','T','px2mm_xz','px2mm_y','offset_c2a', ...
         'n_trials','dom_paw','dom_paw_mm','nondom_paw','nondom_paw_mm',...
-        'water','water_mm','siz','n_max_points','resnet'...
+        'water','water_mm','siz','max_siz','n_max_points','resnet'...
         )
     disp('loaded tracked features data')
+    if  ~exist("start_trials","var")
+        if siz(1)>max_siz, start_trials=2;
+        else, start_trials=1; end
+    end
 
 end
 
@@ -366,13 +371,13 @@ maxY_L = 150;
 ppDom_paw = nan(size(dom_paw));
 ppNonDom_paw = nan(size(nondom_paw));
 % all session in a row mat
-siz_sess = sum(siz);
+siz_sess = sum(siz(start_trials:end));
 ppDom_paw_sess = [];
 ppNonDom_paw_sess = [];
 ppDom_paw_sess_from_init = [];
 
 % Go thorugh trials, clean amd interpolate
-for tt = 1:n_trials
+for tt = start_trials:n_trials
     warning('off','all')
 
     ff = 1:siz(tt);
@@ -451,12 +456,19 @@ end
 
 % Split partial speed vec into trials
 speed_DomPaw = nan(size(ppDom_paw));
+siz_no1 = siz;
+siz_no1(1) = max_siz;
 % loop across trials
-for i = 1:n_trials
+for i = start_trials:n_trials
     if i==1
-        speed_DomPaw(1:siz(i),:,i) = speed_DomPaw_sess(1:siz(i),:,i);
+        speed_DomPaw(1:siz_no1(i),:,i) = speed_DomPaw_sess(1:siz_no1(i),:,i);
     else
-        speed_DomPaw(1:siz(i),:,i) = speed_DomPaw_sess(sum(siz(1:(i-1)))+1:sum(siz(1:i)),:);
+        if start_trials>1
+            speed_DomPaw(1:siz_no1(i),:,i) = speed_DomPaw_sess(sum(siz_no1(start_trials:(i-1)))+1:sum(siz_no1(start_trials:i)),:);
+        else
+            speed_DomPaw(1:siz(i),:,i) = speed_DomPaw_sess(sum(siz(start_trials:(i-1)))+1:sum(siz(start_trials:i)),:);
+        end
+
     end
 end
 
@@ -564,12 +576,13 @@ med_watx = nanmedian(water_x(:));
 % Findpeaks params
 if strcmp(paw_pref,'L')
     prec_close_water = 0.84;
+    pkprominence=20 ; %25
 else
     prec_close_water = 0.84;
+    pkprominence=40 ; %25
 end
 pkheight = floor(prec_close_water*med_watx); %288; % 299; %299
 pkdist= 55; % 60;
-pkprominence=40 ; %25
 
 % Find peaks across session to find IRI (interreach interval)
 [pks_sess, pks_frames] = findpeaks(ppDom_paw_sess_from_init(:,1),'MinPeakHeight',...
@@ -577,8 +590,13 @@ pkprominence=40 ; %25
     'Annotate','extents');
 
 % parameters for defining if water was available (purposeful reaches)
-extra_frames=10;
+if strcmp(mouse,'3_Toblerone')
+    extra_frames=40;
+else
+    extra_frames=10;
+end
 nan_min = 40;
+water_intermitent_max = 15;
 
 % REACH PARAMETERS
 % parameters of reach interval
@@ -646,6 +664,7 @@ iti_end_frame = nan(n_trials,1);
 
 is_push_trial = nan(n_trials,1);
 water_location_trial =  nan(n_trials,1);
+flag_hit_from_harp = zeros(n_trials,1);
 
 invalid_push_intrial = nan(n_trials,20);
 invalid_pull_intrial = nan(n_trials,20);
@@ -665,18 +684,23 @@ clr_left = behavior.colors.left_color;
 clr_iti = [.8 .8 .8];
 clr_inval = [.5 .5 .5];
 
+% Correct for one trial missing
+sync_from_log_all = [behavior.sync.time_newTrial_log;behavior.inputs.real_log_all(end,1)];
+if n_trials ==  length(sync_from_log_all)
+    n_trials = n_trials-1;
+end
+
 % ------------------------------------------------------------------
 % TRIAL LOOP
 disp('Finding reaches...')
 
-%tt=2
-for tt = 1:n_trials
+%tt=30
+for tt = start_trials:n_trials
     disp(strcat('trial ',num2str(tt)))
 
     real_tt = tt-1;
 
     % SYNCCING  -----------------------------------------------
-    sync_from_log_all = [behavior.sync.time_newTrial_log;behavior.inputs.real_log_all(end,1)];
     f=fit([1;siz(tt)],sync_from_log_all(tt:tt+1),'poly1');
     frames_timestamps_tmp = f.p2+f.p1*[1:siz(tt)];
     frames_timestamps(tt,1:siz(tt)) =  frames_timestamps_tmp;
@@ -765,14 +789,23 @@ for tt = 1:n_trials
     end
     t_water_x = water(1:siz(tt),1,tt);
     cumsum_nan = cumsum([zeros(water_appeared,1);isnan(t_water_x(water_appeared:end))]);
+    jmp_cumsum_nan = find(diff(cumsum_nan)==1);
+    jmp_cumsum_nan_small = jmp_cumsum_nan(diff(jmp_cumsum_nan)<=1);
+    check_water_tracking_interm = length(jmp_cumsum_nan)-length(jmp_cumsum_nan_small);
 
     if max(cumsum_nan) == numel(cumsum_nan) % only nans
         last_water = 1;
     elseif max(cumsum_nan)<nan_min
         last_water = find(cumsum_nan==max(cumsum_nan),1);
     else
-        last_water = find(cumsum_nan>=nan_min,1);
+        if check_water_tracking_interm>water_intermitent_max % CHECK THIS 
+            last_water = water_reached_frame(tt);
+            flag_hit_from_harp(tt) = 1; 
+        else
+            last_water = find(cumsum_nan>=nan_min,1);
+        end
     end
+    
     purpose_length=1:(last_water+extra_frames);
     water_length=1:last_water;
     last_frame_wWater(tt,1)=last_water+extra_frames;
@@ -849,12 +882,11 @@ for tt = 1:n_trials
     %% LOOP OF REACHES
     close all
 
-
     if nreaches_trial == 0
         disp(strcat('no reaches in trial',num2str(tt)))
     else
         for r_ind = 1:nreaches_trial
-            %r_ind=4
+            %r_ind=1
             % reach max rame
             rr=xmax_frame(r_ind);
             nn_max_points_tt = siz(tt);
@@ -1097,7 +1129,6 @@ for tt = 1:n_trials
             % 4 -> lifted paw: drink/reach
             p1_max_cat3 = 90;
             cov_high = 250;
-            max_z_lim = 200;
             %threshold_resting = 180;
             if strcmp(phenotype,'ctr')==1
                 lags_lim = 8;
@@ -1110,9 +1141,13 @@ for tt = 1:n_trials
             if strcmp(paw_pref,'R')
                 threshold_resting = 180;
                 threshold_drink = 240;
+                min_length_drink = 60;
+                max_z_lim = 200;
             elseif strcmp(paw_pref,'L')
                 threshold_resting = 180;
-                threshold_drink = 240;           
+                threshold_drink = 240;  
+                min_length_drink = 45;
+                max_z_lim = 220;
             end
 
             % GROOMING
@@ -1137,8 +1172,10 @@ for tt = 1:n_trials
             end
             mean_reach_until_reach = nanmean(reach(1:max_reach,1));
 
+            % PAW NOT DISPLACEDE ENOUGH TO BE A REACH
+            reach_displacement_short = reach(max_reach,1)-reach(rising_start,1)<min_length_drink;
 
-
+            % DEFINE CATEGORY
             if ( ...
                     (paws_covary_in_x &&  paws_covary_in_z && (max(reach(:,3))>max_z_lim || max(reach_otherPaw(:,3))>max_z_lim) ) || ...
                     (paws_covary_in_x && cov_peak_high  &&  (max(reach(:,3))>max_z_lim || max(reach_otherPaw(:,3))>max_z_lim) ) ...
@@ -1154,7 +1191,8 @@ for tt = 1:n_trials
 
                 % STARTING POSITION: PAW LIFTED
             else
-                if ~(start_from_stop_lifted || start_forward_mov_lifted) && mean_reach_until_reach>threshold_drink
+                if (~(start_from_stop_lifted || start_forward_mov_lifted) && ...
+                        mean_reach_until_reach>threshold_drink && reach_displacement_short)
                     which_cat = 4;
                 else
                     which_cat = 2;
@@ -1574,7 +1612,7 @@ for tt = 1:n_trials
             hit_reach = cat(1,hit_reach,is_hit);
             success_reach = cat(1,success_reach,is_success);
             nonDomPaw_resting = cat(1,nonDomPaw_resting,is_nonDomPaw_resting);
-
+       
         end % end of if there are reaches in trial
     end % end of reach loop
 end % end trial loop
@@ -1665,6 +1703,7 @@ trials.time_to_hit = time_to_hit;
 trials.n_trials = n_trials;
 trials.size_trial = siz;
 trials.hit_later_than_detection = hit_later_than_detection;
+trials.flag_hit_from_harp = flag_hit_from_harp;
 % Trial paramers
 trials.trial_params.find_peaks.prec_close_water = prec_close_water;
 trials.trial_params.find_peaks.pkheight = pkheight;

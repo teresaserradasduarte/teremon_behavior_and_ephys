@@ -1,13 +1,14 @@
 %% Get neuron struct
 clear; close all; clc
 
+
 %% Manage paths
 person = 'teresa';
 %person = 'simon';
 if strcmp(person,'teresa')
     behavior_root ='D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\data\TD\behavior_data\raw_data';
     %ephys_root = 'E:'; %group_ephys = '20230801_ChocolateGroup';
-    ephys_root = 'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\5_FerreroRocher';
+    ephys_root = 'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\';
     %ephys_root = 'G:\ePhys\'; %group_ephys = '20230801_ChocolateGroup';
 elseif strcmp(person,'simon')
     behavior_root ='D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\data\TD\behavior_data\raw_data';
@@ -22,13 +23,13 @@ animals = {...
     'Toblerone',...
     'Milka',...
     'FerreroRocher'};
-animal_idx = 5;
+animal_idx = 3;
 mouse = sprintf('%i_%s',animal_idx,animals{animal_idx});
-%ephys_root = strcat(ephys_root,filesep,mouse);
+ephys_root = strcat(ephys_root,mouse);
 
-session = 'R4';
-ephys_sess = '18082023_Ferrero_StrCer_S4_g0';
-imec_id = 1; % <---HERE!!!!!
+session = 'R6';
+ephys_sess = '02082023_CoteDorS1CB_g0';
+imec_id = 0; % <---HERE!!!!!
 
 %catGT_folder = 'catGT_KS_DSRemoved';
 sorter_folder = 'catGT\kilosort4';

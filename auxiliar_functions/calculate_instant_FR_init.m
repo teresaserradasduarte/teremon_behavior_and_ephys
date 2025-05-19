@@ -38,9 +38,13 @@ for j = 1:n_events
 
         % find the spike after the interval for final ISI
         last_spk_idx=find(spike_init_flags,1,'last');
-        finish_instant_isi = eg_neurons(i).st(last_spk_idx+1) - ...
-            eg_neurons(i).st(last_spk_idx);
-        FR_init_raw(bin_edges_padded>init_spikes(end),j) = 1/finish_instant_isi;
+        if last_spk_idx==length(eg_neurons(i).st)
+            FR_init_raw(bin_edges_padded>init_spikes(end),j) = 0;
+        else
+            finish_instant_isi = eg_neurons(i).st(last_spk_idx+1) - ...
+                eg_neurons(i).st(last_spk_idx);
+            FR_init_raw(bin_edges_padded>init_spikes(end),j) = 1/finish_instant_isi;
+        end
     end
 end
 end

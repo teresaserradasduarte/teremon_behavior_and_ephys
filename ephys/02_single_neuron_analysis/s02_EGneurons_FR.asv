@@ -13,21 +13,21 @@ animals = {...
     'Toblerone',...
     'Milka',...
     'FerreroRocher'};
-animal_idx = 4;
+animal_idx = 2;
 mouse = sprintf('%i_%s',animal_idx,animals{animal_idx});
 
 %% Session & ephys source
-sess = 'R4';
+sess = 'R2';
 imec_id = 0;
-ephys_sess = '18082023_Milka_StrCer_S4_g0';
+ephys_sess = '08082023_CoteDor_StrCer_S6_g0';
 sorter_folder = 'catGT\kilosort4';
-ephys_local_folder = true;
-flag_plot_rasters = false;
+ephys_local_folder = false;
+flag_plot_rasters = true;
 flag_save_behavior_funda = true;
 
 %% Depth cortex 
-%depth_cortex_lim = 65.1348;
-depthLim_phyID = 88;%51;% nam; = 88; %363;
+depth_cortex_lim = nan; %1000; %65.1348;
+depthLim_phyID = 407;
 
 
 %% paths
@@ -41,7 +41,6 @@ ephys_dir = fullfile(ephys_root,ephys_sess,strcat(ephys_sess,'_imec',num2str(ime
 
 % Load mat files
 load(fullfile(behavior_dir,"behavior_session.mat"));
-
 load(fullfile(reaching_dir,"session_reaching_data_paw.mat"));
 load(fullfile(ephys_dir,"neurons_session.mat"));
 
@@ -80,7 +79,6 @@ if isnan(depth_cortex_lim)
 else
     depth_lim = depth_cortex_lim;
 end
-
 
 eg_neurons = struct();
 for i=1:n_eg
@@ -139,6 +137,15 @@ left_idx = behavior.reach.left_idx(behavior.reach.left_idx<=nr_trials);
 right_idx = behavior.reach.right_idx(behavior.reach.right_idx<=nr_trials);
 center_idx = behavior.reach.center_idx(behavior.reach.center_idx<=nr_trials);
 
+% Convert L/R to Dom/non-Dom
+if strcmp(mouse_info.paw_pref,'R')
+    dom_idx = right_idx;
+    nondom_idx = left_idx;
+elseif strcmp(mouse_info.paw_pref,'L')
+    dom_idx = left_idx;
+    nondom_idx = right_idx;
+end
+
 % Event times from logs - trial init
 initiation_times_all = behavior.inputs.read_log(behavior.logs.trial_init_ind,1);
 inva_push_times_all = behavior.inputs.read_log(behavior.logs.inval_push_ind,1);
@@ -151,6 +158,8 @@ pp_times = cat(1,initiation_times,inva_push_times,inva_pull_times);
 init_invPush_invPull_idx = cat(1,ones(length(initiation_times),1),...
     ones(length(inva_push_times),1)*2,ones(length(inva_pull_times),1)*3);
 nr_pp_events = length(pp_times);
+valPushPull_invalPushPull_idx = init_invPush_invPull_idx;
+valPushPull_invalPushPull_idx(push_idx)=0;
 
 % event times from reaches
 reach_times = reaches.reach_timestamps_mat(:,reaches.reach_params.reach_interval.max_reach);
@@ -179,8 +188,12 @@ if flag_save_behavior_funda == true
     bhv.left_idx = left_idx;
     bhv.center_idx = center_idx;
     bhv.right_idx = right_idx;
+    bhv.dom_idx = dom_idx;
+    bhv.nondom_idx = nondom_idx;
+    bhv.paw_pref = mouse_info.paw_pref;
     bhv.pp_times = pp_times;
     bhv.init_invPush_invPull_idx = init_invPush_invPull_idx;
+    bhv.valPushPull_invalPushPull_idx = valPushPull_invalPushPull_idx;
     bhv.reach_inVec_idx = reach_inVec_idx;
     bhv.reach_times_inVec = reach_times_inVec;
     bhv.reach_trials_inVec = reach_trials_inVec;
@@ -194,8 +207,20 @@ end
 
 
 %% Sanity check - reaches keep their identities
+% Hit + location
+left_hit_idx = find(ismember(bhv.reach_trials_inVec,bhv.left_idx) & bhv.hit_inVec==1);
+center_hit_idx = find(ismember(bhv.reach_trials_inVec,bhv.center_idx) & bhv.hit_inVec==1);
+right_hit_idx = find(ismember(bhv.reach_trials_inVec,bhv.right_idx) & bhv.hit_inVec==1);
+hitIdx = find(hit_inVec==1);
+hLRC_idx = zeros(length(hitIdx),1);
+hLRC_idx(ismember(hitIdx,left_hit_idx))=1;
+hLRC_idx(ismember(hitIdx,center_hit_idx))=2;
+hLRC_idx(ismember(hitIdx,right_hit_idx))=3;
+
 figure
-plot(squeeze(reaches_inVec_px(:,1,hit_inVec==1)))
+plot(squeeze(reaches_inVec_px(:,1,left_hit_idx)),'color',behavior.colors.left_color); hold on
+plot(squeeze(reaches_inVec_px(:,1,center_hit_idx)),'color',behavior.colors.center_color); hold on
+plot(squeeze(reaches_inVec_px(:,1,right_hit_idx)),'color',behavior.colors.right_color); hold off
 %plot(squeeze(reaches_inVec_px(:,1,cat_reach_inVec==1)))
 
 %% Align to events
@@ -234,7 +259,7 @@ save_out_init = fullfile(save_out,'init_align');
 if ~exist(save_out_init,'dir'), mkdir(save_out_init); end
 
 tic
-fprintf('Calculating FR alinged to init and reach...')
+fprintf('Calculating FR alinged to init and reach... \n')
 for i = 1:n_eg
     % ALIGN TO REACH ----------------------------------------
      [eg_neurons,FR_reach_raw] = calculate_instant_FR_reach(eg_neurons,i,event_tm_reach,win_padded,bin_width);
@@ -255,23 +280,31 @@ for i = 1:n_eg
         figProp.name = 'Hit reaches';
         figProp.ticks_y = reach_trials_inVec(trialsIdx);
         figProp.y_name = 'trial idx across session';
-        plot_reach_raster_and_psth(eg_neurons,i,bin_edges,win_interest,figProp,trialsIdx)
+        plot_reach_raster_and_psth(eg_neurons,i,bin_edges,win_interest,figProp,trialsIdx); hold on
+        colors_lcr=[behavior.colors.left_color;behavior.colors.center_color;behavior.colors.right_color];
+        [~, ~, color_idx_lcr] = unique(hLRC_idx); % convert to 1, 2, 3
+        scatter(ones(length(hLRC_idx),1)*-2.9, (1:length(hLRC_idx))', 36, colors_lcr(color_idx_lcr, :), 'filled'); hold off      
         saveas(gcf,fullfile(save_out_reach,['neu',num2str(eg_neurons(i).phyID),'_reach.png']),'png')
 
+
         figure(2)
-        trialsIdx = find(init_invPush_invPull_idx==1);
+        trialsIdx = find(init_invPush_invPull_idx==1); 
+        pp_idx=valPushPull_invalPushPull_idx(init_invPush_invPull_idx==1);
         figProp.name = 'Push-Pull valid';
         figProp.ticks_y = trialsIdx;
         figProp.y_name = 'trial idx across session';
-        plot_init_raster_and_psth(eg_neurons,i,bin_edges,win_interest,figProp,trialsIdx)
+        plot_init_raster_and_psth(eg_neurons,i,bin_edges,win_interest,figProp,trialsIdx); hold on
+        colors_pp=[behavior.colors.push_clr;behavior.colors.pull_clr];
+        [~, ~, color_idx_pp] = unique(pp_idx); % convert to 1, 2, 3
+        scatter(ones(length(pp_idx),1)*-2.9, (1:length(pp_idx))', 36, colors_pp(color_idx_pp, :), 'filled');  hold off
         saveas(gcf,fullfile(save_out_init,['neu',num2str(eg_neurons(i).phyID),'_init.png']),'png');
     end
 end
 toc
-fprintf('done')
+fprintf('done \n')
 
 %% Save
-fprintf('Saving...')
+fprintf('Saving... \n')
 tic
 if strcmp(region,"BG")
 save(fullfile(save_mat,'eg_neurons.mat'),'eg_neurons','depths_all',...
@@ -283,7 +316,7 @@ elseif strcmp(region,"CB")
         'depth_lim','idx_CB','idx_CB_DCN','idx_CB_CTX','-v7.3');
 end
 toc
-fprintf('done!!')
+fprintf('done!! \n')
 
 
 

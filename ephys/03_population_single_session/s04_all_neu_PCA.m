@@ -1,0 +1,1206 @@
+%% PCA, TILES AND tPCA ----------------------------------------
+% May 2025
+clear; close all; clc
+
+%% Load data
+% Group and individual
+rootdir = 'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD';
+group = '20230801_ChocolateGroup';
+setup = 'headfixed_dynamicTarget';
+animals = {...
+    'CoteDor',...
+    'Lindt',...
+    'Toblerone',...
+    'Milka',...
+    'FerreroRocher'};
+reg = 'CB';
+if strcmp(reg,'BG'), load_struct = 'N_BG_all';
+elseif strcmp(reg,'CB'), load_struct = 'N_CB_all';
+elseif strcmp(reg,'CT'), load_struct = 'N_CT_all';
+end
+
+%% Create path to save
+save_mat = fullfile(rootdir,"ephys_and_behavior","mat_files",group);
+save_out = fullfile(rootdir,"ephys_and_behavior","out_files",group,'group',reg,'PCA');
+if ~exist(save_out,"dir"), mkdir(save_out); end
+if ~exist(save_mat,"dir"), mkdir(save_mat); end
+save_name = strcat('PCA_',reg,'.mat');
+
+%% Load neurons
+load(fullfile(rootdir,"ephys_and_behavior/","mat_files/",group,"all_neurons_pooled.mat"),load_struct)
+load(fullfile(rootdir,"ephys_and_behavior/","mat_files/",group,"1_CoteDor/","R6/","BG/","eg_neurons.mat"),'eg_neu_FR_params');
+load(fullfile(rootdir,"behavior_data/","analyzed_data/mat_files/","20230511_ChocolateGroup/","headfixed_dynamicTarget/","1_CoteDor/","R6/","behavior_session.mat"),'behavior')
+
+%% Convert to table
+N_tmp = struct2table(N_CB_all);
+% exclude the only session with just neurons from the cerebellum
+exclude_idx = strcmp(N_tmp.mouse, '1_CoteDor') & strcmp(N_tmp.sess, 'R1');
+N = N_tmp(~exclude_idx, :);
+
+% exclude non-learner
+N_pp = N(~strcmp(N.mouse, '3_Toblerone'), :);
+n_neu_pp = size(N_pp,1);
+
+%% New WIN and smoothing
+bin_width = eg_neu_FR_params.bin_width;
+bin_edges_orig = eg_neu_FR_params.bin_edges;
+nr_bins_original = eg_neu_FR_params.nr_bins;
+% new window
+new_win = [-2 2]; 
+[~,new_bin_edges_start] = min(abs(bin_edges_orig-new_win(1)));
+[~,new_bin_edges_stop] = min(abs(bin_edges_orig-new_win(2)));
+bin_edges = bin_edges_orig(new_bin_edges_start:new_bin_edges_stop);
+nr_bins = length(bin_edges);
+edges_range = new_bin_edges_start:new_bin_edges_stop;
+
+% Smooting
+sig_pk = .02;
+k_pc = gausskernel('sig',sig_pk,'binwidth',bin_width);
+bin_edges_sm = bin_edges(1)-k_pc.paddx(1):bin_width:bin_edges(end)-k_pc.paddx(2)+bin_width;
+nr_bins_sm = length(bin_edges_sm);
+
+% Save
+PCA_params.bin_width = bin_width;
+PCA_params.bin_edges_original = bin_edges_orig;
+PCA_params.bin_edges = bin_edges;
+PCA_params.new_win = new_win;
+PCA_params.sig_pk = sig_pk;
+PCA_params.k_pc = k_pc;
+PCA_params.bin_edges_sm =bin_edges_sm;
+
+
+%% Figure params
+axeOpt = {'linewidth',1.5,'box','off','GridAlpha',...
+    0.05,'ticklength',[1,1]*.01,'fontsize',10, 'TickDir', 'out'};
+
+clr_push = behavior.colors.push_clr;
+clr_pull = behavior.colors.pull_clr;
+
+clr_center = behavior.colors.center_color;
+clr_dom = behavior.colors.clr_dom;
+clr_nondom = behavior.colors.clr_nondom;
+
+clr_init = [63 130 109]./256;
+clr_reach = [44 123 182]./256;
+
+PCA_params.axeOpt = axeOpt;
+PCA_params.colors.clr_push = clr_push;
+PCA_params.colors.clr_pull = clr_pull;
+PCA_params.colors.clr_center = clr_center;
+PCA_params.colors.clr_dom = clr_dom;
+PCA_params.colors.clr_nondom = clr_nondom;
+PCA_params.colors.clr_init = clr_init;
+PCA_params.colors.clr_reach = clr_reach;
+save(fullfile(save_mat,save_name),"PCA_params");
+
+
+%% PCA
+% Resize for the interest window
+conditions_pp = ['push';'pull'];
+nr_conditions_pp = size(conditions_pp,1);
+FR_pp_rs = nan(n_neu_pp,nr_bins_original,nr_conditions_pp);
+for j=1:nr_conditions_pp
+    FR_pp_rs(:,:,j) = N_pp.FR_pp_mat(:,(nr_bins_original*(j-1))+1:nr_bins_original*j);
+end
+FR_pp_win = FR_pp_rs(:,new_bin_edges_start:new_bin_edges_stop,:);
+FR_pp_mat = FR_pp_win(:,:);
+
+[zs_FR_pp, FR_pp_mu, FR_pp_sigma] = zscore(FR_pp_mat');
+[coeff_pp, score_pp, latent_pp, tsquare_pp, explained_pp, mus_pp] = pca(zs_FR_pp);
+
+score_pp_rs = nan(nr_bins,nr_conditions_pp,n_neu_pp);
+for j=1:nr_conditions_pp
+    score_pp_rs(:,j,:) = score_pp((nr_bins*(j-1))+1:nr_bins*j,:);
+end
+
+% smothed win
+score_pp_sm = nan(nr_bins_sm,nr_conditions_pp,n_neu_pp);
+for i = 1:nr_conditions_pp
+    score_pp_sm(:,i,:) = conv2(k_pc.pdf,1,squeeze(score_pp_rs(:,i,:)),"valid");
+end
+
+% Order of cells
+r_coeff_pp = sqrt(coeff_pp(:,1).^2 + coeff_pp(:,2).^2);
+theta_coef_pp = atan2(coeff_pp(:,2), coeff_pp(:,1));
+[theta_coeffPP_sorted, neu_order_pp] = sort(theta_coef_pp);
+cmap = parula(length(neu_order_pp));
+
+% Find the starting point 
+%[~,break_rad] = max(diff(theta_coeffPP_sorted));
+%figure, plot(diff(theta_coeffPP_sorted),'*')
+break_rad = 68;
+n_order_pp = [neu_order_pp(break_rad+1:end);neu_order_pp(1:break_rad)];
+%n_order_pp = neu_order_pp;
+
+% save_out
+save_out_init = fullfile(save_out,'init');
+if ~exist(save_out_init,"dir"), mkdir(save_out_init); end
+
+PCA_init.FR_pp_mat = N_pp.FR_pp_mat';
+PCA_init.zs_FR_pp = zs_FR_pp;
+PCA_init.conditions_pp = conditions_pp;
+PCA_init.score_pp_rs = score_pp_rs;
+PCA_init.score_pp_sm = score_pp_sm;
+PCA_init.n_order_pp = PCA_init;
+PCA_init.explained_pp = explained_pp;
+PCA_init.n_order_pp = n_order_pp;
+
+figure
+plot(cumsum(explained_pp),'-o');
+
+% Save
+save(fullfile(save_mat,save_name),"PCA_init",'-append');
+
+
+%% Check scores
+lw=2;
+figure
+ff=tiledlayout(3,1);
+title(ff,sprintf('%s%s%s','Region: ',reg,' | Trial init'));
+for pc = 1:3
+    nexttile
+    plot(bin_edges,squeeze(score_pp_rs(:,1,pc)),'linewidth',lw,'Color',clr_push); hold on
+    plot(bin_edges,squeeze(score_pp_rs(:,2,pc)),'linewidth',lw,'Color',clr_pull);
+    xlim(new_win);
+    set(gca,axeOpt{:})
+    xline(0,'--','color',[.8 .8 .8 .5],'LineWidth',2);
+    xlabel('time from trial init (s)'); ylabel(sprintf('%s%i%s%.2f%s','PC',pc,' (',explained_pp(pc),'%)'));
+end
+legend(conditions_pp,'box','off')
+
+set(gcf,'position',[2661 175 533 758])
+saveas(gcf,fullfile(save_out_init,'pca_scores_push_pull_val.png'),'png');
+
+% Smoothed scores
+lw=2;
+figure
+ff=tiledlayout(3,1);
+title(ff,sprintf('%s%s%s','Region: ',reg,' | Trial init'));
+for pc = 1:3
+    nexttile
+    plot(bin_edges_sm,squeeze(score_pp_sm(:,1,pc)),'linewidth',lw,'Color',clr_push); hold on
+    plot(bin_edges_sm,squeeze(score_pp_sm(:,2,pc)),'linewidth',lw,'Color',clr_pull);
+    xlim(new_win);
+    set(gca,axeOpt{:})
+    xline(0,'--','color',[.8 .8 .8 .5],'LineWidth',2);
+    xlabel('time from trial init (s)'); ylabel(sprintf('%s%i%s%.2f%s','PC',pc,' (',explained_pp(pc),'%)'));
+end
+legend(conditions_pp,'box','off')
+
+set(gcf,'position',[2661 175 533 758])
+saveas(gcf,fullfile(save_out_init,'pca_scores_push_pull_val_smooth.png'),'png');
+print(gcf, fullfile(save_out_init, 'pca_scores_push_pull_val_smooth.pdf'), '-dpdf', '-painters');
+
+
+%% PCA scores 3D
+figure()
+transp = 0.3;
+transp_p = 0.02;
+init_idx = find(bin_edges==0);
+scatter3(score_pp_sm(:,1,1)',score_pp_sm(:,1,2)',score_pp_sm(:,1,3)',15,'o','filled','MarkerFaceColor',behavior.colors.push_clr,'MarkerFaceAlpha',transp); hold on
+scatter3(score_pp_sm(1,1,1)',score_pp_sm(1,1,2)',score_pp_sm(1,1,3)',100,'o','MarkerEdgeColor',behavior.colors.push_clr,'LineWidth',2);
+scatter3(score_pp_sm(init_idx,1,1)',score_pp_sm(init_idx,1,2)',score_pp_sm(init_idx,1,3)',100,'o','filled','MarkerFaceColor',behavior.colors.push_clr,'MarkerFaceAlpha',1);
+scatter3(score_pp_sm(:,2,1)',score_pp_sm(:,2,2)',score_pp_sm(:,2,3)',15,'o','filled','MarkerFaceColor',behavior.colors.pull_clr,'MarkerFaceAlpha',transp)
+scatter3(score_pp_sm(init_idx,2,1)',score_pp_sm(init_idx,2,2)',score_pp_sm(init_idx,2,3)',100,'o','filled','MarkerFaceColor',behavior.colors.pull_clr,'MarkerFaceAlpha',1);
+scatter3(score_pp_sm(1,2,1)',score_pp_sm(1,2,2)',score_pp_sm(1,2,3)',100,'o','MarkerEdgeColor',behavior.colors.pull_clr,'LineWidth',2);
+
+extra_points = [-1 1];
+yLi = get(gca,'YLim')+extra_points+[-2 2];
+zLi = get(gca,'ZLim')+extra_points;
+xLi = get(gca,'XLim')+extra_points;
+oneMati = ones(size(score_pp_sm(:,1,1)));
+
+scatter3(score_pp_sm(:,1,1)', oneMati .* yLi(1), score_pp_sm(:,1,3)',10,'o','filled','MarkerFaceColor',behavior.colors.push_clr,'MarkerFaceAlpha',transp_p);
+scatter3(score_pp_sm(init_idx,1,1)', oneMati(init_idx) .* yLi(1), score_pp_sm(init_idx,1,3)',80,'o','filled','MarkerFaceColor',behavior.colors.push_clr,'MarkerFaceAlpha',transp);
+scatter3(score_pp_sm(:,1,1)',  score_pp_sm(:,1,2)', oneMati .* zLi(1),10,'o','filled','MarkerFaceColor',behavior.colors.push_clr,'MarkerFaceAlpha',transp_p);
+scatter3(score_pp_sm(init_idx,1,1)',  score_pp_sm(init_idx,1,2)', oneMati(init_idx) .* zLi(1),80,'o','filled','MarkerFaceColor',behavior.colors.push_clr,'MarkerFaceAlpha',transp);
+%scatter3(oneMati .* xLi(2),  score_pp_sm(:,1,2)',score_pp_sm(:,1,3)',10,'o','filled','MarkerFaceColor',behavior.colors.push_clr,'MarkerFaceAlpha',transp_p);
+hold on;
+
+scatter3(score_pp_sm(:,2,1)', oneMati .* yLi(1), score_pp_sm(:,2,3)',10,'o','filled','MarkerFaceColor',behavior.colors.pull_clr,'MarkerFaceAlpha',transp_p);
+scatter3(score_pp_sm(init_idx,2,1)', oneMati(init_idx) .* yLi(1), score_pp_sm(init_idx,2,3)',80,'o','filled','MarkerFaceColor',behavior.colors.pull_clr,'MarkerFaceAlpha',transp);
+scatter3(score_pp_sm(:,2,1)',  score_pp_sm(:,2,2)', oneMati .* zLi(1),10,'o','filled','MarkerFaceColor',behavior.colors.pull_clr,'MarkerFaceAlpha',transp_p);
+scatter3(score_pp_sm(init_idx,2,1)',  score_pp_sm(init_idx,2,2)', oneMati(init_idx) .* zLi(1),80,'o','filled','MarkerFaceColor',behavior.colors.pull_clr,'MarkerFaceAlpha',transp);
+%scatter3(oneMati .* xLi(2),  score_pp_sm(:,2,2)',score_pp_sm(:,2,3)',10,'o','filled','MarkerFaceColor',behavior.colors.pull_clr,'MarkerFaceAlpha',transp_p);
+hold off;
+view(133,25)
+xlabel('PC1'); ylabel('PC2'); zlabel('PC3');
+axis([xLi yLi zLi])
+set(gca,...
+    'plotboxaspectratio',[1,1,1],'ticklength',[1,1]*.025,'linewidth',1.5,...
+    'fontsize',12, 'nextplot','add','tickdir','out','box','off','layer','top',...
+    'GridAlpha',0.005);
+shg
+set(gcf,'Position',[2288         278         628         548],'Color','w');
+saveas(gcf,fullfile(save_out_init,'pca_scores_3D_init.png'),'png');
+print(gcf, fullfile(save_out_init, 'pca_scores_3D_init.pdf'), '-dpdf', '-painters');
+
+%% Save rotating
+figure()
+fps = 0.1;
+transp = 0.3;
+scatter3(score_pp_sm(:,1,1)',score_pp_sm(:,1,2)',score_pp_sm(:,1,3)',15,'o','filled','MarkerFaceColor',behavior.colors.push_clr,'MarkerFaceAlpha',transp); hold on
+scatter3(score_pp_sm(1,1,1)',score_pp_sm(1,1,2)',score_pp_sm(1,1,3)',100,'o','MarkerEdgeColor',behavior.colors.push_clr,'LineWidth',2);
+scatter3(score_pp_sm(init_idx,1,1)',score_pp_sm(init_idx,1,2)',score_pp_sm(init_idx,1,3)',100,'o','filled','MarkerFaceColor',behavior.colors.push_clr,'MarkerFaceAlpha',1);
+scatter3(score_pp_sm(:,2,1)',score_pp_sm(:,2,2)',score_pp_sm(:,2,3)',15,'o','filled','MarkerFaceColor',behavior.colors.pull_clr,'MarkerFaceAlpha',transp)
+scatter3(score_pp_sm(init_idx,2,1)',score_pp_sm(init_idx,2,2)',score_pp_sm(init_idx,2,3)',100,'o','filled','MarkerFaceColor',behavior.colors.pull_clr,'MarkerFaceAlpha',1);
+scatter3(score_pp_sm(1,2,1)',score_pp_sm(1,2,2)',score_pp_sm(1,2,3)',100,'o','MarkerEdgeColor',behavior.colors.pull_clr,'LineWidth',2);
+xlabel('PC1'); ylabel('PC2'); zlabel('PC3');
+set(gca,...
+    'plotboxaspectratio',[1,1,1],'ticklength',[1,1]*.025,'linewidth',1.5,...
+    'fontsize',12, 'nextplot','add','tickdir','out','box','off','layer','top');
+set(gcf,'Position',[2550 188 725 575],'color','w'); grid off
+shg
+axis([xLi-extra_points yLi-extra_points zLi-extra_points])
+
+%rotate_3Dplot(fps)
+rotate_and_save_3Dplot(fps, strcat(save_out_init,filesep,'rotatingScores_init_smooth.gif'))
+
+%% Check sorting order
+figure
+subplot(121)
+scatter(coeff_pp(:,1),coeff_pp(:,2),50,cmap,'filled');
+xlabel('PC1 coefficients'); ylabel('PC2 coefficients')
+set(gca,axeOpt{:})
+title('Position of PC1 vs PC2 coeffs')
+axis square
+hold on
+
+for i=1:n_neu_pp
+    subplot(122)
+    polarplot(theta_coeffPP_sorted(i), r_coeff_pp(neu_order_pp(i)),...
+        'o','MarkerSize', 8, 'MarkerFaceColor',cmap(i,:),'markerEdgeColor','w'); hold on
+end
+colorbar
+%title('Points in Polar Coordinates');
+title('Angular position of PC1 vs PC2 coeffs')
+set(gcf,'Position',[2762         134        1027         734])
+saveas(gcf,fullfile(save_out_init,'PC1coeffs_vs_PC2coeffs_pushPull.png'),'png');
+
+
+% --------------------------------------------------------------------
+%% Neurons tiling!!
+
+% SELECTION: PUSH / PULL
+% Push 
+FR_push_all = cellfun(@(fr, idx) fr(:, idx == 0), ...
+    N_pp.FR_init, N_pp.idx_init_vPP_invPP, ...
+    'UniformOutput', false);
+FR_push_mean_zs = concat_zscore_and_mean(FR_push_all);
+
+% Pull
+FR_pull_all = cellfun(@(fr, idx) fr(:, idx == 1), ...
+    N_pp.FR_init, N_pp.idx_init_vPP_invPP, ...
+    'UniformOutput', false);
+FR_pull_mean_zs = concat_zscore_and_mean(FR_pull_all);
+
+FR_diff_pp = FR_pull_mean_zs-FR_push_mean_zs;
+
+%% PUSH PULL FIGURE
+fig_name = 'tile_push_pull';
+lim_clr = [-.7 1.2];
+lim_clr_diff = [-1 1];
+figure
+ax1 = subplot(131);
+imagesc(bin_edges_orig,1:n_neu_pp,FR_push_mean_zs(:,n_order_pp)',lim_clr);
+if ~strcmp(reg,'BG'), axis xy; end
+xline(0,'--','linewidth',1.5,'color',[1 1 1 .5])
+set(gca,axeOpt{:},'TickDir','out')
+xlabel('time from trial init (s)'); ylabel(sprintf('%s%s','cells in ',reg));
+title({sprintf('%s%s','Mean FR in ',reg);'Push'})
+c=colorbar;
+ylabel(c,'z-scored FR')
+colormap(ax1, 'hot')
+
+ax2 = subplot(132);
+imagesc(bin_edges_orig,1:n_neu_pp,FR_pull_mean_zs(:,n_order_pp)',lim_clr)
+if ~strcmp(reg,'BG'), axis xy; end
+xline(0,'--','linewidth',1.5,'color',[1 1 1 .5])
+set(gca,axeOpt{:},'TickDir','out')
+xlabel('time from trial init (s)'); ylabel(sprintf('%s%s','cells in ',reg));
+title({sprintf('%s%s','Mean FR in ',reg);'Pull'})
+c=colorbar;
+ylabel(c,'z-scored FR')
+colormap(ax2, 'hot')
+
+ax3 = subplot(133);
+imagesc(bin_edges_orig,1:n_neu_pp,FR_diff_pp(:,n_order_pp)',lim_clr_diff)
+if ~strcmp(reg,'BG'), axis xy; end
+xline(0,'--','linewidth',1.5,'color',[1 1 1 .5])
+set(gca,axeOpt{:},'TickDir','out')
+xlabel('time from trial init (s)'); ylabel(sprintf('%s%s','cells in ',reg));
+title({sprintf('%s%s','Mean FR in ',reg);'Diff'})
+c=colorbar;
+ylabel(c,'z-scored FR (sp/s)')
+colormap(ax3, bwr_map)
+
+set(gcf,'position',[1972 212 1870 644],'color','w')
+saveas(gcf,fullfile(save_out_init,[fig_name,'.png']),'png');
+print(gcf, fullfile(save_out_init,[fig_name,'.pdf']), '-dpdf', '-painters');
+
+%% SELECTION: VALID / INVALD
+% Valid 
+FR_val_all = cellfun(@(fr, idx) fr(:, idx == 0 | idx == 1), ...
+    N_pp.FR_init, N_pp.idx_init_vPP_invPP, ...
+    'UniformOutput', false);
+FR_val_mean_zs = concat_zscore_and_mean(FR_val_all);
+
+% Invalid
+FR_inval_all = cellfun(@(fr, idx) fr(:, idx == 2 | idx == 3), ...
+    N_pp.FR_init, N_pp.idx_init_vPP_invPP, ...
+    'UniformOutput', false);
+FR_inval_mean_zs = concat_zscore_and_mean(FR_inval_all);
+
+FR_diff_val = FR_inval_mean_zs-FR_val_mean_zs;
+
+
+%% VALID INVALID FIGURE
+fig_name = 'tile_valid_invalid';
+%lim_clr = [-.7 1.1];
+lim_clr_diff = [-1 1];
+figure
+ax1 = subplot(131);
+imagesc(bin_edges_orig,1:n_neu_pp,FR_val_mean_zs(:,n_order_pp)',lim_clr);
+if ~strcmp(reg,'BG'), axis xy; end
+xline(0,'--','linewidth',1.5,'color',[1 1 1 .5])
+set(gca,axeOpt{:},'TickDir','out')
+xlabel('time from trial init (s)'); ylabel(sprintf('%s%s','cells in ',reg));
+title({sprintf('%s%s','Mean FR in ',reg);'Val'})
+c=colorbar;
+ylabel(c,'z-scored FR')
+colormap(ax1, 'hot')
+
+ax2 = subplot(132);
+imagesc(bin_edges_orig,1:n_neu_pp,FR_inval_mean_zs(:,n_order_pp)',lim_clr)
+if ~strcmp(reg,'BG'), axis xy; end
+xline(0,'--','linewidth',1.5,'color',[1 1 1 .5])
+set(gca,axeOpt{:},'TickDir','out')
+xlabel('time from trial init (s)'); ylabel(sprintf('%s%s','cells in ',reg));
+title({sprintf('%s%s','Mean FR in ',reg);'Inval'})
+c=colorbar;
+ylabel(c,'z-scored FR')
+colormap(ax2, 'hot')
+
+ax3 = subplot(133);
+imagesc(bin_edges_orig,1:n_neu_pp,FR_diff_val(:,n_order_pp)',lim_clr_diff)
+if ~strcmp(reg,'BG'), axis xy; end
+xline(0,'--','linewidth',1.5,'color',[1 1 1 .5])
+set(gca,axeOpt{:},'TickDir','out')
+xlabel('time from trial init (s)'); ylabel(sprintf('%s%s','cells in ',reg));
+title({sprintf('%s%s','Mean FR in ',reg);'Diff'})
+c=colorbar;
+ylabel(c,'z-scored FR (sp/s)')
+colormap(ax3, bwr_map)
+
+set(gcf,'position',[1972 212 1870 644],'color','w')
+saveas(gcf,fullfile(save_out_init,[fig_name,'.png']),'png');
+print(gcf, fullfile(save_out_init,[fig_name,'.pdf']), '-dpdf', '-painters');
+
+%% SELECTION: Dominant, center, non-dominant paw
+% Dominant paw side 
+FR_domi_all = cellfun(@(fr, idx) fr(:, idx == 1), ...
+    N_pp.FR_init, N_pp.DCnD_init, ...
+    'UniformOutput', false);
+FR_domi_mean_zs = concat_zscore_and_mean(FR_domi_all);
+
+% Center
+FR_Ci_all = cellfun(@(fr, idx) fr(:, idx == 2), ...
+    N_pp.FR_init, N_pp.DCnD_init, ...
+    'UniformOutput', false);
+FR_Ci_mean_zs = concat_zscore_and_mean(FR_Ci_all);
+
+% Non-dominant paw side
+FR_ndomi_all = cellfun(@(fr, idx) fr(:, idx == 3), ...
+    N_pp.FR_init, N_pp.DCnD_init, ...
+    'UniformOutput', false);
+FR_ndomi_mean_zs = concat_zscore_and_mean(FR_ndomi_all);
+
+FR_diff_DnD_init = FR_ndomi_mean_zs-FR_domi_mean_zs;
+
+
+%% WATER SIDE FIGURE
+fig_name = 'tile_dom_C_nonDom_init';
+%lim_clr = [-0.8 1.5];
+figure
+ax1 = subplot(131);
+imagesc(bin_edges_orig,1:n_neu_pp,FR_domi_mean_zs(:,n_order_pp)',lim_clr);
+if ~strcmp(reg,'BG'), axis xy; end
+xline(0,'--','linewidth',1.5,'color',[1 1 1 .5])
+set(gca,axeOpt{:},'TickDir','out')
+xlabel('time from trial init (s)'); ylabel(sprintf('%s%s','cells in ',reg));
+title({sprintf('%s%s','Mean FR in ',reg);'Dom side'})
+c=colorbar;
+ylabel(c,'z-scored FR')
+colormap(ax1, 'hot')
+
+ax2 = subplot(132);
+imagesc(bin_edges_orig,1:n_neu_pp,FR_Ci_mean_zs(:,n_order_pp)',lim_clr)
+if ~strcmp(reg,'BG'), axis xy; end
+xline(0,'--','linewidth',1.5,'color',[1 1 1 .5])
+set(gca,axeOpt{:},'TickDir','out')
+xlabel('time from trial init (s)'); ylabel(sprintf('%s%s','cells in ',reg));
+title({sprintf('%s%s','Mean FR in ',reg);'Center'})
+c=colorbar;
+ylabel(c,'z-scored FR')
+colormap(ax2, 'hot')
+
+ax3 = subplot(133);
+imagesc(bin_edges_orig,1:n_neu_pp,FR_ndomi_mean_zs(:,n_order_pp)',lim_clr)
+if ~strcmp(reg,'BG'), axis xy; end
+xline(0,'--','linewidth',1.5,'color',[1 1 1 .5])
+set(gca,axeOpt{:},'TickDir','out')
+xlabel('time from trial init (s)'); ylabel(sprintf('%s%s','cells in ',reg));
+title({sprintf('%s%s','Mean FR in ',reg);'Non-Dom side'})
+c=colorbar;
+ylabel(c,'z-scored FR (sp/s)')
+colormap(ax3, 'hot')
+
+
+set(gcf,'position',[1972 212 1870 644],'color','w')
+saveas(gcf,fullfile(save_out_init,[fig_name,'.png']),'png');
+print(gcf, fullfile(save_out_init,[fig_name,'.pdf']), '-dpdf', '-painters');
+
+
+%% WATER SIDE FIGURE
+fig_name = 'tile_dom_nonDom_diff_init';
+lim_clr = [-0.7 1.2];
+figure
+ax1 = subplot(131);
+imagesc(bin_edges_orig,1:n_neu_pp,FR_domi_mean_zs(:,n_order_pp)',lim_clr);
+if ~strcmp(reg,'BG'), axis xy; end
+xline(0,'--','linewidth',1.5,'color',[1 1 1 .5])
+set(gca,axeOpt{:},'TickDir','out')
+xlabel('time from trial init (s)'); ylabel(sprintf('%s%s','cells in ',reg));
+title({sprintf('%s%s','Mean FR in ',reg);'Dom side'})
+c=colorbar;
+ylabel(c,'z-scored FR')
+colormap(ax1, 'hot')
+
+ax2 = subplot(132);
+imagesc(bin_edges_orig,1:n_neu_pp,FR_ndomi_mean_zs(:,n_order_pp)',lim_clr)
+if ~strcmp(reg,'BG'), axis xy; end
+xline(0,'--','linewidth',1.5,'color',[1 1 1 .5])
+set(gca,axeOpt{:},'TickDir','out')
+xlabel('time from trial init (s)'); ylabel(sprintf('%s%s','cells in ',reg));
+title({sprintf('%s%s','Mean FR in ',reg);'Non-Dom side'})
+c=colorbar;
+ylabel(c,'z-scored FR')
+colormap(ax2, 'hot')
+
+ax3 = subplot(133);
+imagesc(bin_edges_orig,1:n_neu_pp,FR_diff_DnD_init(:,n_order_pp)',lim_clr_diff)
+if ~strcmp(reg,'BG'), axis xy; end
+xline(0,'--','linewidth',1.5,'color',[1 1 1 .5])
+set(gca,axeOpt{:},'TickDir','out')
+xlabel('time from trial init (s)'); ylabel(sprintf('%s%s','cells in ',reg));
+title({sprintf('%s%s','Mean FR in ',reg);'Diff'})
+c=colorbar;
+ylabel(c,'z-scored FR (sp/s)')
+colormap(ax3, bwr_map)
+
+set(gcf,'position',[1972 212 1870 644],'color','w')
+saveas(gcf,fullfile(save_out_init,[fig_name,'.png']),'png');
+print(gcf, fullfile(save_out_init,[fig_name,'.pdf']), '-dpdf', '-painters');
+
+%% ---------------------------------------------------------------------
+% DO THE SAME, NOW ALIGNED TO WATER COLLECTION
+% ----------------------------------------------------------------------
+close all
+n_neu_all = size(N,1);
+%% PCA
+% Resize for the interest window
+conditions_reach = ['dom    ';'center ';'non-dom'];
+nr_conditions_reach = size(conditions_reach,1);
+FR_hDCD_rs = nan(n_neu_all,nr_bins_original,nr_conditions_reach);
+for j=1:nr_conditions_reach
+    FR_hDCD_rs(:,:,j) = N.FR_hDCnD_mat(:,(nr_bins_original*(j-1))+1:nr_bins_original*j);
+end
+FR_hDCD_win = FR_hDCD_rs(:,new_bin_edges_start:new_bin_edges_stop,:);
+FR_hDCD_mat = FR_hDCD_win(:,:);
+
+[zs_FR_hDCnD, FR_hDCnD_mu, FR_hDCnD_sigma] = zscore(FR_hDCD_mat');
+[coeff_hDCnD, score_hDCnD, latent_hDCnD, tsquare_hDCnD, explained_hDCnD, mus_hDCnD] = pca(zs_FR_hDCnD);
+
+% Divide by condition
+score_hDCnD_rs = nan(nr_bins,nr_conditions_reach,n_neu_all);
+for j=1:nr_conditions_reach
+    score_hDCnD_rs(:,j,:) = score_hDCnD((nr_bins*(j-1))+1:nr_bins*j,:);
+end
+
+% Smooth scores
+score_hDCnD_sm = nan(nr_bins_sm,nr_conditions_reach,n_neu_all);
+for i = 1:nr_conditions_reach
+    score_hDCnD_sm(:,i,:) = conv2(k_pc.pdf,1,squeeze(score_hDCnD_rs(:,i,:)),"valid");
+end
+
+% Order of cells
+r_coeff_hDCnD = sqrt(coeff_hDCnD(:,1).^2 + coeff_hDCnD(:,2).^2);
+theta_coef_hDCnD = atan2(coeff_hDCnD(:,2), coeff_hDCnD(:,1));
+[theta_coeff_hDCnD_sorted, neu_order_hDCnD] = sort(theta_coef_hDCnD);
+cmap_hDCnD = parula(length(neu_order_hDCnD));
+
+% Find the starting point 
+[~,break_rad_reach] = max(diff(theta_coeff_hDCnD_sorted));
+n_order_hDCnD = [neu_order_hDCnD(break_rad_reach+1:end);neu_order_hDCnD(1:break_rad_reach)];
+%n_order_hDCnD = neu_order_hDCnD;
+
+% save_out
+save_out_reach = fullfile(save_out,'reach');
+if ~exist(save_out_reach,"dir"), mkdir(save_out_reach); end
+
+PCA_reach.FR_hDCnD_mat = N.FR_hDCnD_mat';
+PCA_reach.zs_FR_hDCnD = zs_FR_hDCnD;
+PCA_reach.conditions_reach = conditions_reach;
+PCA_reach.score_hDCnD_rs = score_hDCnD_rs;
+PCA_reach.score_hDCnD_sm = score_hDCnD_sm;
+PCA_reach.explained_hDCnD = explained_hDCnD;
+PCA_reach.n_order_hDCnD = n_order_hDCnD;
+
+figure
+plot(cumsum(explained_hDCnD),'-o');
+
+save(fullfile(save_mat,save_name),"PCA_reach",'-append');
+
+
+
+%% Check scores
+lw=2;
+figure
+ff=tiledlayout(3,1);
+title(ff,sprintf('%s%s%s','Region: ',reg,' | Water collection'));
+for pc = 1:3
+    nexttile
+    plot(bin_edges,squeeze(score_hDCnD_rs(:,1,pc)),'linewidth',lw,'Color',clr_dom); hold on
+    plot(bin_edges,squeeze(score_hDCnD_rs(:,2,pc)),'linewidth',lw,'Color',clr_center);
+    plot(bin_edges,squeeze(score_hDCnD_rs(:,3,pc)),'linewidth',lw,'Color',clr_nondom);
+    xlim(new_win);
+    set(gca,axeOpt{:})
+    xline(0,'--','color',[.8 .8 .8 .5],'LineWidth',2);
+    xlabel('time from reach endpoint (s)'); ylabel(sprintf('%s%i%s%.2f%s','PC',pc,' (',explained_pp(pc),'%)'));
+end
+legend(conditions_reach,'box','off')
+
+set(gcf,'position',[2661 175 533 758])
+saveas(gcf,fullfile(save_out_reach,'pca_scores_Dom_nonDom.png'),'png');
+
+% Smoothed scores
+lw=2;
+figure
+ff=tiledlayout(3,1);
+title(ff,sprintf('%s%s%s','Region: ',reg,' | Water collection'));
+for pc = 1:3
+    nexttile
+    plot(bin_edges_sm,squeeze(score_hDCnD_sm(:,1,pc)),'linewidth',lw,'Color',clr_dom); hold on
+    plot(bin_edges_sm,squeeze(score_hDCnD_sm(:,2,pc)),'linewidth',lw,'Color',clr_center);
+    plot(bin_edges_sm,squeeze(score_hDCnD_sm(:,3,pc)),'linewidth',lw,'Color',clr_nondom);
+    xlim(new_win);
+    set(gca,axeOpt{:})
+    xline(0,'--','color',[.8 .8 .8 .5],'LineWidth',2);
+    xlabel('time from reach endpoint (s)'); ylabel(sprintf('%s%i%s%.2f%s','PC',pc,' (',explained_pp(pc),'%)'));
+end
+legend(conditions_reach,'box','off')
+
+set(gcf,'position',[2661 175 533 758])
+saveas(gcf,fullfile(save_out_reach,'pca_scores_Dom_nonDom_smooth.png'),'png');
+print(gcf, fullfile(save_out_reach, 'pca_scores_Dom_nonDom_smooth.pdf'), '-dpdf', '-painters');
+
+
+%% PCA scores 3D
+figure()
+transp = 0.3;
+transp_p = 0.02;
+init_idx = find(bin_edges==0);
+scatter3(score_hDCnD_sm(:,1,1)',score_hDCnD_sm(:,1,2)',score_hDCnD_sm(:,1,3)',15,'o','filled','MarkerFaceColor',clr_dom,'MarkerFaceAlpha',transp); hold on
+scatter3(score_hDCnD_sm(1,1,1)',score_hDCnD_sm(1,1,2)',score_hDCnD_sm(1,1,3)',100,'o','MarkerEdgeColor',clr_dom,'LineWidth',2);
+scatter3(score_hDCnD_sm(init_idx,1,1)',score_hDCnD_sm(init_idx,1,2)',score_hDCnD_sm(init_idx,1,3)',100,'o','filled','MarkerFaceColor',clr_dom,'MarkerFaceAlpha',1);
+
+scatter3(score_hDCnD_sm(:,2,1)',score_hDCnD_sm(:,2,2)',score_hDCnD_sm(:,2,3)',15,'o','filled','MarkerFaceColor',clr_center,'MarkerFaceAlpha',transp)
+scatter3(score_hDCnD_sm(init_idx,2,1)',score_hDCnD_sm(init_idx,2,2)',score_hDCnD_sm(init_idx,2,3)',100,'o','filled','MarkerFaceColor',clr_center,'MarkerFaceAlpha',1);
+scatter3(score_hDCnD_sm(1,2,1)',score_hDCnD_sm(1,2,2)',score_hDCnD_sm(1,2,3)',100,'o','MarkerEdgeColor',clr_center,'LineWidth',2);
+
+scatter3(score_hDCnD_sm(:,3,1)',score_hDCnD_sm(:,3,2)',score_hDCnD_sm(:,3,3)',15,'o','filled','MarkerFaceColor',clr_nondom,'MarkerFaceAlpha',transp)
+scatter3(score_hDCnD_sm(init_idx,3,1)',score_hDCnD_sm(init_idx,3,2)',score_hDCnD_sm(init_idx,3,3)',100,'o','filled','MarkerFaceColor',clr_nondom,'MarkerFaceAlpha',1);
+scatter3(score_hDCnD_sm(1,3,1)',score_hDCnD_sm(1,3,2)',score_hDCnD_sm(1,3,3)',100,'o','MarkerEdgeColor',clr_nondom,'LineWidth',2);
+
+extra_points = [-1 1];
+yLi = get(gca,'YLim')+extra_points+[0 5];
+zLi = get(gca,'ZLim')+extra_points+[-5 0];
+xLi = get(gca,'XLim')+extra_points;
+oneMati = ones(size(score_hDCnD_sm(:,1,1)));
+
+scatter3(score_hDCnD_sm(:,1,1)', oneMati .* yLi(1), score_hDCnD_sm(:,1,3)',10,'o','filled','MarkerFaceColor',clr_dom,'MarkerFaceAlpha',transp_p);
+scatter3(score_hDCnD_sm(init_idx,1,1)', oneMati(init_idx) .* yLi(1), score_hDCnD_sm(init_idx,1,3)',80,'o','filled','MarkerFaceColor',clr_dom,'MarkerFaceAlpha',transp);
+scatter3(score_hDCnD_sm(:,1,1)',  score_hDCnD_sm(:,1,2)', oneMati .* zLi(1),10,'o','filled','MarkerFaceColor',clr_dom,'MarkerFaceAlpha',transp_p);
+scatter3(score_hDCnD_sm(init_idx,1,1)',  score_hDCnD_sm(init_idx,1,2)', oneMati(init_idx) .* zLi(1),80,'o','filled','MarkerFaceColor',clr_dom,'MarkerFaceAlpha',transp);
+%scatter3(oneMati .* xLi(2),  score_hDCnD_sm(:,1,2)',score_hDCnD_sm(:,1,3)',10,'o','filled','MarkerFaceColor',behavior.colors.push_clr,'MarkerFaceAlpha',transp_p);
+hold on;
+
+scatter3(score_hDCnD_sm(:,2,1)', oneMati .* yLi(1), score_hDCnD_sm(:,2,3)',10,'o','filled','MarkerFaceColor',clr_center,'MarkerFaceAlpha',transp_p);
+scatter3(score_hDCnD_sm(init_idx,2,1)', oneMati(init_idx) .* yLi(1), score_hDCnD_sm(init_idx,2,3)',80,'o','filled','MarkerFaceColor',clr_center,'MarkerFaceAlpha',transp);
+scatter3(score_hDCnD_sm(:,2,1)',  score_hDCnD_sm(:,2,2)', oneMati .* zLi(1),10,'o','filled','MarkerFaceColor',clr_center,'MarkerFaceAlpha',transp_p);
+scatter3(score_hDCnD_sm(init_idx,2,1)',  score_hDCnD_sm(init_idx,2,2)', oneMati(init_idx) .* zLi(1),80,'o','filled','MarkerFaceColor',clr_center,'MarkerFaceAlpha',transp);
+%scatter3(oneMati .* xLi(2),  score_hDCnD_sm(:,2,2)',score_hDCnD_sm(:,2,3)',10,'o','filled','MarkerFaceColor',behavior.colors.pull_clr,'MarkerFaceAlpha',transp_p);
+
+scatter3(score_hDCnD_sm(:,3,1)', oneMati .* yLi(1), score_hDCnD_sm(:,3,3)',10,'o','filled','MarkerFaceColor',clr_nondom,'MarkerFaceAlpha',transp_p);
+scatter3(score_hDCnD_sm(init_idx,3,1)', oneMati(init_idx) .* yLi(1), score_hDCnD_sm(init_idx,3,3)',80,'o','filled','MarkerFaceColor',clr_nondom,'MarkerFaceAlpha',transp);
+scatter3(score_hDCnD_sm(:,3,1)',  score_hDCnD_sm(:,3,2)', oneMati .* zLi(1),10,'o','filled','MarkerFaceColor',clr_nondom,'MarkerFaceAlpha',transp_p);
+scatter3(score_hDCnD_sm(init_idx,3,1)',  score_hDCnD_sm(init_idx,3,2)', oneMati(init_idx) .* zLi(1),80,'o','filled','MarkerFaceColor',clr_nondom,'MarkerFaceAlpha',transp);
+%scatter3(oneMati .* xLi(2),  score_hDCnD_sm(:,2,2)',score_hDCnD_sm(:,2,3)',10,'o','filled','MarkerFaceColor',behavior.colors.pull_clr,'MarkerFaceAlpha',transp_p);
+
+hold off;
+view(114,19)
+xlabel('PC1'); ylabel('PC2'); zlabel('PC3');
+axis([xLi yLi zLi])
+set(gca,...
+    'plotboxaspectratio',[1,1,1],'ticklength',[1,1]*.025,'linewidth',1.5,...
+    'fontsize',12, 'nextplot','add','tickdir','out','box','off','layer','top',...
+    'GridAlpha',0.005);
+shg
+set(gcf,'Position',[2288         278         628         548],'Color','w');
+saveas(gcf,fullfile(save_out_reach,'pca_scores_3D_reach.png'),'png');
+print(gcf, fullfile(save_out_reach, 'pca_scores_3D_reach.pdf'), '-dpdf', '-painters');
+
+%% Save rotating
+figure()
+fps = 0.1;
+transp = 0.3;
+scatter3(score_hDCnD_sm(:,1,1)',score_hDCnD_sm(:,1,2)',score_hDCnD_sm(:,1,3)',15,'o','filled','MarkerFaceColor',clr_dom,'MarkerFaceAlpha',transp); hold on
+scatter3(score_hDCnD_sm(1,1,1)',score_hDCnD_sm(1,1,2)',score_hDCnD_sm(1,1,3)',100,'o','MarkerEdgeColor',clr_dom,'LineWidth',2);
+scatter3(score_hDCnD_sm(init_idx,1,1)',score_hDCnD_sm(init_idx,1,2)',score_hDCnD_sm(init_idx,1,3)',100,'o','filled','MarkerFaceColor',clr_dom,'MarkerFaceAlpha',1);
+
+scatter3(score_hDCnD_sm(:,2,1)',score_hDCnD_sm(:,2,2)',score_hDCnD_sm(:,2,3)',15,'o','filled','MarkerFaceColor',clr_center,'MarkerFaceAlpha',transp)
+scatter3(score_hDCnD_sm(init_idx,2,1)',score_hDCnD_sm(init_idx,2,2)',score_hDCnD_sm(init_idx,2,3)',100,'o','filled','MarkerFaceColor',clr_center,'MarkerFaceAlpha',1);
+scatter3(score_hDCnD_sm(1,2,1)',score_hDCnD_sm(1,2,2)',score_hDCnD_sm(1,2,3)',100,'o','MarkerEdgeColor',clr_center,'LineWidth',2);
+
+scatter3(score_hDCnD_sm(:,3,1)',score_hDCnD_sm(:,3,2)',score_hDCnD_sm(:,3,3)',15,'o','filled','MarkerFaceColor',clr_nondom,'MarkerFaceAlpha',transp)
+scatter3(score_hDCnD_sm(init_idx,2,1)',score_hDCnD_sm(init_idx,3,2)',score_hDCnD_sm(init_idx,3,3)',100,'o','filled','MarkerFaceColor',clr_nondom,'MarkerFaceAlpha',1);
+scatter3(score_hDCnD_sm(1,3,1)',score_hDCnD_sm(1,3,2)',score_hDCnD_sm(1,3,3)',100,'o','MarkerEdgeColor',clr_nondom,'LineWidth',2);
+
+xlabel('PC1'); ylabel('PC2'); zlabel('PC3');
+set(gca,...
+    'plotboxaspectratio',[1,1,1],'ticklength',[1,1]*.025,'linewidth',1.5,...
+    'fontsize',12, 'nextplot','add','tickdir','out','box','off','layer','top');
+set(gcf,'Position',[2550 188 725 575],'color','w'); grid off
+shg
+axis([xLi-extra_points yLi-extra_points zLi-extra_points])
+
+%rotate_3Dplot(fps)
+rotate_and_save_3Dplot(fps, strcat(save_out_reach,filesep,'rotatingScores_reach_smooth.gif'))
+
+%%
+% Check sorting order
+%for i=1:n_neu
+figure
+subplot(121)
+scatter(coeff_hDCnD(:,1),coeff_hDCnD(:,2),50,cmap_hDCnD,'filled');
+xlabel('PC1 coefficients'); ylabel('PC2 coefficients')
+set(gca,axeOpt{:})
+title('Position of PC1 vs PC2 coeffs')
+axis square
+hold on
+
+for i=1:n_neu_all
+    subplot(122)
+    polarplot(theta_coeff_hDCnD_sorted(i), r_coeff_hDCnD(neu_order_hDCnD(i)),...
+        'o','MarkerSize', 8, 'MarkerFaceColor',cmap_hDCnD(i,:),'markerEdgeColor','w'); hold on
+end
+colorbar
+%title('Points in Polar Coordinates');
+title('Angular position of PC1 vs PC2 coeffs')
+set(gcf,'Position',[2762         134        1027         734])
+saveas(gcf,fullfile(save_out_reach,'PC1coeffs_vs_PC2coeffs_hit.png'),'png');
+
+
+%% -------------------------------------------------------------------
+% Neurons tiling!!
+
+% SELECTION: Dom/C/non-Dom
+% Dom 
+FR_D_all = cellfun(@(fr, idx1, idx2) fr(:, idx1 == 1 & (idx2==1)), ...
+    N.FR_reach, N.idx_reach_hDCnD, N.idx_reach_cat, ...
+    'UniformOutput', false);
+FR_D_mean_zs = concat_zscore_and_mean(FR_D_all);
+
+% Center
+FR_C_all = cellfun(@(fr, idx1, idx2) fr(:, idx1 == 2 & (idx2==1)), ...
+    N.FR_reach, N.idx_reach_hDCnD, N.idx_reach_cat, ...
+    'UniformOutput', false);
+FR_C_mean_zs = concat_zscore_and_mean(FR_C_all);
+
+% non-Dom
+FR_nD_all = cellfun(@(fr, idx1, idx2) fr(:, idx1 == 3 & (idx2==1)), ...
+    N.FR_reach, N.idx_reach_hDCnD, N.idx_reach_cat, ...
+    'UniformOutput', false);
+FR_nD_mean_zs = concat_zscore_and_mean(FR_nD_all);
+
+
+FR_diff_DnD = FR_nD_mean_zs-FR_D_mean_zs;
+
+%% Dom/C/nonDom FIGURE
+fig_name = 'tile_reach_DCnD';
+lim_clr = [-.8 1.5];
+%bins_sel=1001:1751;
+%bins_sel=1251:1751;
+%bins_sel=1:length(bin_edges);
+figure
+ax1 = subplot(131);
+imagesc(bin_edges_orig,1:n_neu_all,FR_D_mean_zs(:,n_order_hDCnD)',lim_clr);
+axis xy; 
+xline(0,'--','linewidth',1.5,'color',[1 1 1 .5])
+set(gca,axeOpt{:},'TickDir','out')
+xlabel('time from reach endpoint (s)'); ylabel(sprintf('%s%s','cells in ',reg));
+title({sprintf('%s%s','Mean FR in ',reg);'Dom side'})
+c=colorbar;
+ylabel(c,'z-scored FR')
+colormap(ax1, 'hot')
+
+ax2 = subplot(132);
+imagesc(bin_edges_orig,1:n_neu_all,FR_C_mean_zs(:,n_order_hDCnD)',lim_clr)
+axis xy;
+xline(0,'--','linewidth',1.5,'color',[1 1 1 .5])
+set(gca,axeOpt{:},'TickDir','out')
+xlabel('time from reach endpoint (s)'); ylabel(sprintf('%s%s','cells in ',reg));
+title({sprintf('%s%s','Mean FR in ',reg);'Center'})
+c=colorbar;
+ylabel(c,'z-scored FR')
+colormap(ax2, 'hot')
+
+ax3 = subplot(133);
+imagesc(bin_edges_orig,1:n_neu_all,FR_nD_mean_zs(:,n_order_hDCnD)',lim_clr)
+axis xy;
+xline(0,'--','linewidth',1.5,'color',[1 1 1 .5])
+set(gca,axeOpt{:},'TickDir','out')
+xlabel('time from reach endpoint (s)'); ylabel(sprintf('%s%s','cells in ',reg));
+title({sprintf('%s%s','Mean FR in ',reg);'Non-Dom side'})
+c=colorbar;
+ylabel(c,'z-scored FR (sp/s)')
+colormap(ax3,  'hot')
+
+set(gcf,'position',[1972 212 1870 644],'color','w')
+saveas(gcf,fullfile(save_out_reach,[fig_name,'.png']),'png');
+print(gcf, fullfile(save_out_reach,[fig_name,'.pdf']), '-dpdf', '-painters');
+
+
+%% Dom/nonDom/diff FIGURE 
+fig_name = 'tile_reach_DnD_wDiff';
+%lim_clr = [-.9 1.5];
+%bins_sel=1001:1751;
+%bins_sel=1251:1751;
+%bins_sel=1:length(bin_edges);
+figure
+ax1 = subplot(131);
+imagesc(bin_edges_orig,1:n_neu_all,FR_D_mean_zs(:,n_order_hDCnD)',lim_clr);
+axis xy;
+xline(0,'--','linewidth',1.5,'color',[1 1 1 .5])
+set(gca,axeOpt{:},'TickDir','out')
+xlabel('time from reach endpoint (s)'); ylabel(sprintf('%s%s','cells in ',reg));
+title({sprintf('%s%s','Mean FR in ',reg);'Dom side'})
+c=colorbar;
+ylabel(c,'z-scored FR')
+colormap(ax1, 'hot')
+
+ax2 = subplot(132);
+imagesc(bin_edges_orig,1:n_neu_all,FR_C_mean_zs(:,n_order_hDCnD)',lim_clr)
+axis xy;
+xline(0,'--','linewidth',1.5,'color',[1 1 1 .5])
+set(gca,axeOpt{:},'TickDir','out')
+xlabel('time from reach endpoint (s)'); ylabel(sprintf('%s%s','cells in ',reg));
+title({sprintf('%s%s','Mean FR in ',reg);'Non-Dom side'})
+c=colorbar;
+ylabel(c,'z-scored FR')
+colormap(ax2, 'hot')
+
+ax3 = subplot(133);
+imagesc(bin_edges_orig,1:n_neu_all,FR_diff_DnD(:,n_order_hDCnD)',lim_clr_diff)
+axis xy;
+xline(0,'--','linewidth',1.5,'color',[1 1 1 .5])
+set(gca,axeOpt{:},'TickDir','out')
+xlabel('time from reach endpoint (s)'); ylabel(sprintf('%s%s','cells in ',reg));
+title({sprintf('%s%s','Mean FR in ',reg);'Diff'})
+c=colorbar;
+ylabel(c,'z-scored FR (sp/s)')
+colormap(ax3,  bwr_map)
+
+set(gcf,'position',[1972 212 1870 644],'color','w')
+saveas(gcf,fullfile(save_out_reach,[fig_name,'.png']),'png');
+print(gcf, fullfile(save_out_reach,[fig_name,'.pdf']), '-dpdf', '-painters');
+
+%% SELECTION: L/C/R
+% Dom 
+FR_L_all = cellfun(@(fr, idx1, idx2) fr(:, idx1 == 1 & idx2==1), ...
+    N.FR_reach, N.idx_reach_LCR, N.idx_reach_cat, ...
+    'UniformOutput', false);
+FR_L_mean_zs = concat_zscore_and_mean(FR_L_all);
+
+% non-Dom
+FR_R_all = cellfun(@(fr, idx1, idx2) fr(:, idx1 == 3 & idx2==1), ...
+    N.FR_reach, N.idx_reach_LCR, N.idx_reach_cat, ...
+    'UniformOutput', false);
+FR_R_mean_zs = concat_zscore_and_mean(FR_R_all);
+
+
+
+%% L/C/R FIGURE
+fig_name = 'tile_reach_LCR';
+%lim_clr = [-.5 .8];
+%bins_sel=1001:1751;
+%bins_sel=1251:1751;
+%bins_sel=1:length(bin_edges);
+figure
+ax1 = subplot(131);
+imagesc(bin_edges_orig,1:n_neu_all,FR_L_mean_zs(:,n_order_hDCnD)',lim_clr);
+axis xy;
+xline(0,'--','linewidth',1.5,'color',[1 1 1 .5])
+set(gca,axeOpt{:},'TickDir','out')
+xlabel('time from reach endpoint (s)'); ylabel(sprintf('%s%s','cells in ',reg));
+title({sprintf('%s%s','Mean FR in ',reg);'Left'})
+c=colorbar;
+ylabel(c,'z-scored FR')
+colormap(ax1, 'hot')
+
+ax2 = subplot(132);
+imagesc(bin_edges_orig,1:n_neu_all,FR_C_mean_zs(:,n_order_hDCnD)',lim_clr)
+axis xy;
+xline(0,'--','linewidth',1.5,'color',[1 1 1 .5])
+set(gca,axeOpt{:},'TickDir','out')
+xlabel('time from reach endpoint (s)'); ylabel(sprintf('%s%s','cells in ',reg));
+title({sprintf('%s%s','Mean FR in ',reg);'Center'})
+c=colorbar;
+ylabel(c,'z-scored FR')
+colormap(ax2, 'hot')
+
+ax3 = subplot(133);
+imagesc(bin_edges_orig,1:n_neu_all,FR_R_mean_zs(:,n_order_hDCnD)',lim_clr)
+axis xy;
+xline(0,'--','linewidth',1.5,'color',[1 1 1 .5])
+set(gca,axeOpt{:},'TickDir','out')
+xlabel('time from reach endpoint (s)'); ylabel(sprintf('%s%s','cells in ',reg));
+title({sprintf('%s%s','Mean FR in ',reg);'Right'})
+c=colorbar;
+ylabel(c,'z-scored FR (sp/s)')
+colormap(ax3,  'hot')
+
+set(gcf,'position',[1972 212 1870 644],'color','w')
+saveas(gcf,fullfile(save_out_reach,[fig_name,'.png']),'png');
+print(gcf, fullfile(save_out_reach,[fig_name,'.pdf']), '-dpdf', '-painters');
+
+%% SELECTION: Hit/miss
+% Hit 
+FR_hit_all = cellfun(@(fr, idx) fr(:, idx == 1), ...
+    N.FR_reach, N.idx_reach_hit, ...
+    'UniformOutput', false);
+FR_hit_mean_zs = concat_zscore_and_mean(FR_hit_all);
+
+% Miss
+FR_miss_all = cellfun(@(fr, idx) fr(:, idx == 0), ...
+    N.FR_reach, N.idx_reach_hit, ...
+    'UniformOutput', false);
+FR_miss_mean_zs = concat_zscore_and_mean(FR_miss_all);
+
+FR_diff_hitMiss = FR_miss_mean_zs-FR_hit_mean_zs;
+
+%% FIGURE HIT MISS
+fig_name = 'tile_hit_miss';
+%lim_clr = [-.8 1.5];
+%bins_sel=1001:1751;
+%bins_sel=1251:1751;
+%bins_sel=1:length(bin_edges);
+figure
+ax1 = subplot(131);
+imagesc(bin_edges_orig,1:n_neu_all,FR_hit_mean_zs(:,n_order_hDCnD)',lim_clr);
+axis xy;
+xline(0,'--','linewidth',1.5,'color',[1 1 1 .5])
+set(gca,axeOpt{:},'TickDir','out')
+xlabel('time from reach endpoint (s)'); ylabel(sprintf('%s%s','cells in ',reg));
+title({sprintf('%s%s','Mean FR in ',reg);'Hit'})
+c=colorbar;
+ylabel(c,'z-scored FR')
+colormap(ax1, 'hot')
+
+ax2 = subplot(132);
+imagesc(bin_edges_orig,1:n_neu_all,FR_miss_mean_zs(:,n_order_hDCnD)',lim_clr)
+axis xy;
+xline(0,'--','linewidth',1.5,'color',[1 1 1 .5])
+set(gca,axeOpt{:},'TickDir','out')
+xlabel('time from reach endpoint (s)'); ylabel(sprintf('%s%s','cells in ',reg));
+title({sprintf('%s%s','Mean FR in ',reg);'Miss'})
+c=colorbar;
+ylabel(c,'z-scored FR')
+colormap(ax2, 'hot')
+
+ax3 = subplot(133);
+imagesc(bin_edges_orig,1:n_neu_all,FR_diff_hitMiss(:,n_order_hDCnD)',lim_clr_diff)
+axis xy;
+xline(0,'--','linewidth',1.5,'color',[1 1 1 .5])
+set(gca,axeOpt{:},'TickDir','out')
+xlabel('time from reach endpoint (s)'); ylabel(sprintf('%s%s','cells in ',reg));
+title({sprintf('%s%s','Mean FR in ',reg);'Diff'})
+c=colorbar;
+ylabel(c,'z-scored FR (sp/s)')
+colormap(ax3,  bwr_map)
+
+set(gcf,'position',[1972 212 1870 644],'color','w')
+saveas(gcf,fullfile(save_out_reach,[fig_name,'.png']),'png');
+print(gcf, fullfile(save_out_reach,[fig_name,'.pdf']), '-dpdf', '-painters');
+
+
+%% SELECTION: success/fail
+% Success 
+FR_suc_all = cellfun(@(fr, idx) fr(:, idx == 1), ...
+    N.FR_reach, N.idx_reach_succ, ...
+    'UniformOutput', false);
+FR_suc_mean_zs = concat_zscore_and_mean(FR_suc_all);
+
+% Fail
+FR_fail_all = cellfun(@(fr, idx) fr(:, idx == 0), ...
+    N.FR_reach, N.idx_reach_succ, ...
+    'UniformOutput', false);
+FR_fail_mean_zs = concat_zscore_and_mean(FR_fail_all);
+
+
+FR_diff_SucFail = FR_fail_mean_zs-FR_suc_mean_zs;
+
+
+%% FIGURE SUCCESS/FAIL
+fig_name = 'tile_succ_fail';
+%lim_clr = [-.8 1.1];
+%bins_sel=1001:1751;
+%bins_sel=1251:1751;
+%bins_sel=1:length(bin_edges);
+figure
+ax1 = subplot(131);
+imagesc(bin_edges_orig,1:n_neu_all,FR_suc_mean_zs(:,n_order_hDCnD)',lim_clr);
+axis xy;
+xline(0,'--','linewidth',1.5,'color',[1 1 1 .5])
+set(gca,axeOpt{:},'TickDir','out')
+xlabel('time from reach endpoint (s)'); ylabel(sprintf('%s%s','cells in ',reg));
+title({sprintf('%s%s','Mean FR in ',reg);'Success'})
+c=colorbar;
+ylabel(c,'z-scored FR')
+colormap(ax1, 'hot')
+
+ax2 = subplot(132);
+imagesc(bin_edges_orig,1:n_neu_all,FR_fail_mean_zs(:,n_order_hDCnD)',lim_clr)
+axis xy;
+xline(0,'--','linewidth',1.5,'color',[1 1 1 .5])
+set(gca,axeOpt{:},'TickDir','out')
+xlabel('time from reach endpoint (s)'); ylabel(sprintf('%s%s','cells in ',reg));
+title({sprintf('%s%s','Mean FR in ',reg);'Fail'})
+c=colorbar;
+ylabel(c,'z-scored FR')
+colormap(ax2, 'hot')
+
+ax3 = subplot(133);
+imagesc(bin_edges_orig,1:n_neu_all,FR_diff_SucFail(:,n_order_hDCnD)',lim_clr_diff)
+axis xy;
+xline(0,'--','linewidth',1.5,'color',[1 1 1 .5])
+set(gca,axeOpt{:},'TickDir','out')
+xlabel('time from reach endpoint (s)'); ylabel(sprintf('%s%s','cells in ',reg));
+title({sprintf('%s%s','Mean FR in ',reg);'Diff'})
+c=colorbar;
+ylabel(c,'z-scored FR (sp/s)')
+colormap(ax3,  bwr_map)
+
+set(gcf,'position',[1972 212 1870 644],'color','w')
+saveas(gcf,fullfile(save_out_reach,[fig_name,'.png']),'png');
+print(gcf, fullfile(save_out_reach,[fig_name,'.pdf']), '-dpdf', '-painters');
+
+%% SELECTION: Categories
+% full reach 
+FR_r1_all = cellfun(@(fr, idx) fr(:, idx == 1), ...
+    N.FR_reach, N.idx_reach_cat, ...
+    'UniformOutput', false);
+FR_r1_mean_zs = concat_zscore_and_mean(FR_r1_all);
+
+FR_r2_all = cellfun(@(fr, idx) fr(:, idx == 2), ...
+    N.FR_reach, N.idx_reach_cat, ...
+    'UniformOutput', false);
+FR_r2_mean_zs = concat_zscore_and_mean(FR_r2_all);
+
+FR_r3_all = cellfun(@(fr, idx) fr(:, idx == 3), ...
+    N.FR_reach, N.idx_reach_cat, ...
+    'UniformOutput', false);
+FR_r3_mean_zs = concat_zscore_and_mean(FR_r3_all);
+
+FR_r4_all = cellfun(@(fr, idx) fr(:, idx == 4), ...
+    N.FR_reach, N.idx_reach_cat, ...
+    'UniformOutput', false);
+FR_r4_mean_zs = concat_zscore_and_mean(FR_r4_all);
+
+%% FIGURE REACH TYPES
+fig_name = 'tile_reach_types';
+lim_clr = [-.7 1.1];
+%bins_sel=1001:1751;
+%bins_sel=1251:1751;
+%bins_sel=1:length(bin_edges);
+figure
+subplot(141)
+imagesc(bin_edges_orig,1:n_neu_all,FR_r1_mean_zs(:,n_order_hDCnD)',lim_clr);
+axis xy;
+xline(0,'--','linewidth',1.5,'color',[1 1 1 .5])
+set(gca,axeOpt{:},'TickDir','out')
+xlabel('time from reach endpoint (s)'); ylabel(sprintf('%s%s','cells in ',reg));
+title({sprintf('%s%s','Mean FR in ',reg);'Full reaches'})
+c=colorbar;
+ylabel(c,'z-scored FR (sp/s)')
+
+subplot(142)
+imagesc(bin_edges_orig,1:n_neu_all,FR_r2_mean_zs(:,n_order_hDCnD)',lim_clr)
+axis xy;
+xline(0,'--','linewidth',1.5,'color',[1 1 1 .5])
+set(gca,axeOpt{:},'TickDir','out')
+xlabel('time from reach endpoint (s)'); ylabel(sprintf('%s%s','cells in ',reg));
+title({sprintf('%s%s','Mean FR in ',reg);'Lifted paw reaches'})
+c=colorbar;
+ylabel(c,'z-scored FR (sp/s)')
+
+subplot(143)
+imagesc(bin_edges_orig,1:n_neu_all,FR_r3_mean_zs(:,n_order_hDCnD)',lim_clr)
+axis xy;
+xline(0,'--','linewidth',1.5,'color',[1 1 1 .5])
+set(gca,axeOpt{:},'TickDir','out')
+xlabel('time from reach endpoint (s)'); ylabel(sprintf('%s%s','cells in ',reg));
+title({sprintf('%s%s','Mean FR in ',reg);'Drink / Lick'})
+c=colorbar;
+ylabel(c,'z-scored FR (sp/s)')
+
+subplot(144)
+imagesc(bin_edges_orig,1:n_neu_all,FR_r4_mean_zs(:,n_order_hDCnD)',lim_clr)
+axis xy;
+xline(0,'--','linewidth',1.5,'color',[1 1 1 .5])
+set(gca,axeOpt{:},'TickDir','out')
+xlabel('time from reach endpoint (s)'); ylabel(sprintf('%s%s','cells in ',reg));
+title({sprintf('%s%s','Mean FR in ',reg);'Grooming'})
+c=colorbar;
+ylabel(c,'z-scored FR (sp/s)')
+
+colormap("hot")
+
+set(gcf,'position',[1972 212 1870 644],'color','w')
+saveas(gcf,fullfile(save_out_reach,[fig_name,'_w2.png']),'png');
+print(gcf, fullfile(save_out_reach,[fig_name,'_w2.pdf']), '-dpdf', '-painters');
+
+%% ------------------------------------------------------------------------
+% TARGETED PCA (i'm losing it)
+% -------------------------------------------------------------------------
+close all
+[coeff_pp_dim, score_pp_dim, latent_pp_dim, tsquare_pp_dim, explained_pp_dim, mus_pp_dim] = pca(FR_diff_pp(edges_range,:));
+[coeff_val_dim, score_val_dim, latent_val_dim, tsquare_val_dim, explained_val_dim, mus_val_dim] = pca(FR_diff_val(edges_range,:));
+tPCA_init_scores = cat(2,score_pp_dim(:,1),score_val_dim(:,1));
+
+[coeff_DnD_dim, score_DnD_dim, latent_DnD_dim, tsquare_DnD_dim, explained_DnD_dim, mus_DnD_dim] = pca(FR_diff_DnD(edges_range,:));
+[coeff_hit_dim, score_hit_dim, latent_hit_dim, tsquare_hit_dim, explained_hit_dim, mus_hit_dim] = pca(FR_diff_hitMiss(edges_range,:));
+tPCA_reach_scores = cat(2,score_DnD_dim(:,1),score_hit_dim(:,1));
+
+tPCA.tPCA_init_scores = tPCA_init_scores;
+tPCA.tPCA_reach_scores = tPCA_reach_scores;
+save(fullfile(save_mat,save_name),"tPCA",'-append');
+
+
+%% Window for display
+sel_range_tPCA = [-1 1];
+[~,bin_tPCA_start] = min(abs(bin_edges-sel_range_tPCA(1)));
+[~,bin_tPCA_stop] = min(abs(bin_edges-sel_range_tPCA(2)));
+tPCA_range_bins = bin_tPCA_start:bin_tPCA_stop;
+
+%% Figure targeted PCA init
+fig_name = 'tPCA_init';
+sz_dot = 6;
+figure
+tt = tiledlayout(2,2);
+ title(tt,sprintf('%s%s','targeted PCA | init | region: ',reg));
+
+nexttile(1)
+plot(bin_edges,tPCA_init_scores(:,1),'color',clr_init,'linewidth',2); hold on
+plot(bin_edges(init_idx),tPCA_init_scores(init_idx,1),'o','MarkerFaceColor',clr_init,'MarkerEdgeColor',clr_init,'MarkerSize',sz_dot);
+plot(bin_edges(bin_tPCA_start),tPCA_init_scores(bin_tPCA_start,1),'o','MarkerFaceColor','w','MarkerEdgeColor',clr_init,'MarkerSize',sz_dot);
+plot(bin_edges(bin_tPCA_stop),tPCA_init_scores(bin_tPCA_stop,1),'o','MarkerFaceColor','w','MarkerEdgeColor',[.5 .5 .5],'MarkerSize',sz_dot);
+
+xline(0,'--','linewidth',1.5,'color',[.5 .5 .5 .5])
+xlim(new_win);
+set(gca,axeOpt{:})
+xlabel('time from trial init (s)'); ylabel('push/pull dimension');
+
+nexttile(3)
+plot(bin_edges,tPCA_init_scores(:,2),'color',clr_init,'linewidth',2); hold on
+plot(bin_edges(init_idx),tPCA_init_scores(init_idx,2),'o','MarkerFaceColor',clr_init,'MarkerEdgeColor',clr_init,'MarkerSize',sz_dot);
+plot(bin_edges(bin_tPCA_start),tPCA_init_scores(bin_tPCA_start,2),'o','MarkerFaceColor','w','MarkerEdgeColor',clr_init,'MarkerSize',sz_dot);
+plot(bin_edges(bin_tPCA_stop),tPCA_init_scores(bin_tPCA_stop,2),'o','MarkerFaceColor','w','MarkerEdgeColor',[.5 .5 .5],'MarkerSize',sz_dot);
+xline(0,'--','linewidth',1.5,'color',[.5 .5 .5 .5])
+xlim(new_win);
+set(gca,axeOpt{:})
+xlabel('time from trial init (s)'); ylabel('valid/invalid dimension');
+
+ax=nexttile(2);
+ax.Layout.TileSpan = [2,1];
+plot(tPCA_init_scores(:,1),tPCA_init_scores(:,2),'color',[clr_init .2],'linewidth',2); hold on
+plot(tPCA_init_scores(tPCA_range_bins,1),tPCA_init_scores(tPCA_range_bins,2),'color',clr_init,'linewidth',2); hold on
+plot(tPCA_init_scores(init_idx,1),tPCA_init_scores(init_idx,2),'o','MarkerFaceColor',clr_init,'MarkerEdgeColor',clr_init,'MarkerSize',sz_dot);
+plot(tPCA_init_scores(bin_tPCA_start,1),tPCA_init_scores(bin_tPCA_start,2),'o','MarkerFaceColor','w','MarkerEdgeColor',clr_init,'MarkerSize',sz_dot);
+plot(tPCA_init_scores(bin_tPCA_stop,1),tPCA_init_scores(bin_tPCA_stop,2),'o','MarkerFaceColor','w','MarkerEdgeColor',[.5 .5 .5],'MarkerSize',sz_dot);
+set(gca,axeOpt{:})
+axis square
+xlabel('push/pull'); ylabel('valid/invalid dimension');
+set(gcf,'position',[2524         451        1075         436],'color','w');
+
+saveas(gcf,fullfile(save_out_init,[fig_name,'.png']),'png');
+print(gcf, fullfile(save_out_init,[fig_name,'.pdf']), '-dpdf', '-painters');
+
+
+%% Figure targeted PCA reach
+
+fig_name = 'tPCA_reach';
+sz_dot = 6;
+figure
+tt = tiledlayout(2,2);
+ title(tt,sprintf('%s%s','targeted PCA | reach | region: ',reg));
+
+nexttile(1)
+plot(bin_edges,tPCA_reach_scores(:,1),'color',clr_reach,'linewidth',2); hold on
+plot(bin_edges(init_idx),tPCA_reach_scores(init_idx,1),'o','MarkerFaceColor',clr_reach,'MarkerEdgeColor',clr_reach,'MarkerSize',sz_dot);
+plot(bin_edges(bin_tPCA_start),tPCA_reach_scores(bin_tPCA_start,1),'o','MarkerFaceColor','w','MarkerEdgeColor',clr_reach,'MarkerSize',sz_dot);
+plot(bin_edges(bin_tPCA_stop),tPCA_reach_scores(bin_tPCA_stop,1),'o','MarkerFaceColor','w','MarkerEdgeColor',[.5 .5 .5],'MarkerSize',sz_dot);
+
+xline(0,'--','linewidth',1.5,'color',[.5 .5 .5 .5])
+xlim(new_win);
+set(gca,axeOpt{:})
+xlabel('time from reach endpoint (s)'); ylabel('water loc dimension');
+
+nexttile(3)
+plot(bin_edges,tPCA_reach_scores(:,2),'color',clr_reach,'linewidth',2); hold on
+plot(bin_edges(init_idx),tPCA_reach_scores(init_idx,2),'o','MarkerFaceColor',clr_reach,'MarkerEdgeColor',clr_reach,'MarkerSize',sz_dot);
+plot(bin_edges(bin_tPCA_start),tPCA_reach_scores(bin_tPCA_start,2),'o','MarkerFaceColor','w','MarkerEdgeColor',clr_reach,'MarkerSize',sz_dot);
+plot(bin_edges(bin_tPCA_stop),tPCA_reach_scores(bin_tPCA_stop,2),'o','MarkerFaceColor','w','MarkerEdgeColor',[.5 .5 .5],'MarkerSize',sz_dot);
+xline(0,'--','linewidth',1.5,'color',[.5 .5 .5 .5])
+xlim(new_win);
+set(gca,axeOpt{:})
+xlabel('time from reach endpoint  (s)'); ylabel('hit/miss dimension');
+
+ax=nexttile(2);
+ax.Layout.TileSpan = [2,1];
+plot(tPCA_reach_scores(:,1),tPCA_reach_scores(:,2),'color',[clr_reach .2],'linewidth',2); hold on
+plot(tPCA_reach_scores(tPCA_range_bins,1),tPCA_reach_scores(tPCA_range_bins,2),'color',clr_reach,'linewidth',2); hold on
+plot(tPCA_reach_scores(init_idx,1),tPCA_reach_scores(init_idx,2),'o','MarkerFaceColor',clr_reach,'MarkerEdgeColor',clr_reach,'MarkerSize',sz_dot);
+plot(tPCA_reach_scores(bin_tPCA_start,1),tPCA_reach_scores(bin_tPCA_start,2),'o','MarkerFaceColor','w','MarkerEdgeColor',clr_reach,'MarkerSize',sz_dot);
+plot(tPCA_reach_scores(bin_tPCA_stop,1),tPCA_reach_scores(bin_tPCA_stop,2),'o','MarkerFaceColor','w','MarkerEdgeColor',[.5 .5 .5],'MarkerSize',sz_dot);
+set(gca,axeOpt{:})
+axis square
+xlabel('water loc dimension'); ylabel('hit/miss dimension');
+set(gcf,'position',[2524         451        1075         436],'color','w');
+
+saveas(gcf,fullfile(save_out_reach,[fig_name,'.png']),'png');
+print(gcf, fullfile(save_out_reach,[fig_name,'.pdf']), '-dpdf', '-painters');
+
+
+
+
+
+
+
+
+
+
+
+
+
+

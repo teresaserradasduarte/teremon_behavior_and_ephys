@@ -1,0 +1,147 @@
+% Get extra-good neurons, calculate instantaneous FR, order neurons
+clear; close all; clc
+
+%% Load data
+% Group and individual
+group = '20230801_ChocolateGroup';
+group_behav = '20230511_ChocolateGroup';
+setup = 'headfixed_dynamicTarget';
+animals = {...
+    'CoteDor',...
+    'Lindt',...
+    'Toblerone',...
+    'Milka',...
+    'FerreroRocher'};
+
+all_sess = {['R1';'R6'],...
+    ['R1';'R2';'R4'],...
+    ['R3';'R6'],...
+    ['R4'],...
+    ['R1';'R4';'R6']};
+
+all_reg = ['CB';'BG';'CT'];
+
+
+for m=1:length(animals)
+    animal_idx = m;
+    mouse = sprintf('%i_%s',animal_idx,animals{animal_idx});
+    fprintf('%s%s%s\n','Running ',mouse,'...')
+
+    for s=1:size(all_sess{m},1)
+        sess = all_sess{m}(s,:);
+        fprintf('%s%s%s\n','session ',sess,'...')
+
+        for r=1:size(all_reg,1)
+            reg = all_reg(r,:);
+            fprintf('%s%s%s\n','region ',reg,'...')
+
+            %% paths
+            if (strcmp(reg,'BG') || strcmp(reg,'CT')), region = 'BG';
+            elseif strcmp(reg,'CB'), region = 'CB'; end
+
+            rootdir = 'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD';
+            behavior_dir = fullfile(rootdir,"behavior_data","raw_data",group_behav,setup,mouse,sess);
+            reaching_dir = fullfile(rootdir,"behavior_data","analyzed_data","mat_files",group_behav,setup,mouse,sess);
+            bhv_dir = fullfile(rootdir,"ephys_and_behavior","mat_files",group,mouse,sess);
+            ephys_eg_dir = fullfile(rootdir,"ephys_and_behavior/","mat_files/",group,mouse,sess,region);
+            ephys_pca_dir = fullfile(rootdir,"ephys_and_behavior/","mat_files/",group,mouse,sess,reg);
+
+            if ~exist(ephys_pca_dir,'dir')
+                fprintf('%s%s%s\n','region ',reg,' has no data. Skipping...')
+
+            else
+                % Load mat files
+                load(fullfile(bhv_dir,"behavior_fundamentals.mat"));
+                load(fullfile(reaching_dir,"session_reaching_data_paw.mat"));
+                load(fullfile(ephys_eg_dir,"eg_neurons.mat"));
+                load(fullfile(ephys_pca_dir,['pca_',reg,'.mat']),'FR_hDCnD','FR_pp_mat');
+
+                % Check name of idx
+                if strcmp(reg,'BG'), idx_reg = idx_BG; regi = 'BG ';
+                elseif  strcmp(reg,'CT'), idx_reg = idx_CT;  regi = 'CTX';
+                elseif strcmp(reg,'CB'), idx_reg = 1:length(eg_neurons); regi = 'CB ';
+                end
+
+                % % Save output
+                save_mat = fullfile(rootdir,"ephys_and_behavior","mat_files",group,mouse,sess,reg);
+                if ~exist(save_mat,"dir"), mkdir(save_mat); end
+
+                %% Behavioral variables missing
+                reach_inVec_idx = bhv.reach_inVec_idx;
+                bhv.suc_inVec = reaches.success_reach(reach_inVec_idx);
+                bhv.hit_inVec = reaches.hit_reach(reach_inVec_idx);
+
+                bhv.left_inVec = ismember(bhv.reach_trials_inVec,bhv.left_idx);
+                bhv.center_inVec =  ismember(bhv.reach_trials_inVec,bhv.center_idx);
+                bhv.right_inVec = ismember(bhv.reach_trials_inVec,bhv.right_idx);
+
+                bhv.push_inVec = ismember(bhv.reach_trials_inVec,bhv.push_idx);
+                bhv.pull_inVec = ismember(bhv.reach_trials_inVec,bhv.pull_idx);
+
+                bhv.pp_inVec_idx = zeros(size(bhv.reach_trials_inVec));
+                bhv.pp_inVec_idx(bhv.push_inVec==1) = 0;
+                bhv.pp_inVec_idx(bhv.pull_inVec==1) = 1;
+
+                bhv.LCR_inVec_idx = zeros(size(bhv.reach_trials_inVec));
+                bhv.LCR_inVec_idx(bhv.center_inVec==1) = 2;
+                bhv.LCR_inVec_idx(bhv.left_inVec==1) = 1;
+                bhv.LCR_inVec_idx(bhv.right_inVec==1) = 3;
+
+                bhv.DCnD_init = zeros(length(bhv.init_invPush_invPull_idx),1);
+                bhv.DCnD_init(bhv.center_idx) = 2;
+                bhv.DCnD_inVec_idx = zeros(size(bhv.reach_trials_inVec));
+                bhv.DCnD_inVec_idx(bhv.center_inVec) = 2;
+                if strcmp(bhv.paw_pref,'R')
+                    bhv.DCnD_inVec_idx(bhv.right_inVec) = 1;
+                    bhv.DCnD_inVec_idx(bhv.left_inVec) = 3;
+                    bhv.DCnD_init(bhv.right_idx) = 1;
+                    bhv.DCnD_init(bhv.left_idx) = 3;
+                elseif strcmp(bhv.paw_pref,'L')
+                    bhv.DCnD_inVec_idx(bhv.left_inVec) = 1;
+                    bhv.DCnD_inVec_idx(bhv.right_inVec) = 3;
+                    bhv.DCnD_init(bhv.left_idx) = 1;
+                    bhv.DCnD_init(bhv.right_idx) = 3;
+                end
+                save(fullfile(bhv_dir,"behavior_fundamentals.mat"),'bhv');
+
+
+
+                %% Create table for each region
+                neu_eg = struct2table(eg_neurons);
+                neu = removevars(neu_eg, {'unitIdx','CCG_bins','CCG','templateID','templateWeight','templatePeakCh','templateWaveforms'});
+
+                % Add behavioral variables
+                neu.idx_init_vPP_invPP = repmat(bhv.valPushPull_invalPushPull_idx,[1 size(neu,1)])';
+                neu.DCnD_init = repmat(bhv.DCnD_init,[1 size(neu,1)])';
+
+                neu.idx_reach_cat = repmat(bhv.cat_reach_inVec,[1 size(neu,1)])';
+                neu.idx_reach_hit = repmat(bhv.hit_inVec,[1 size(neu,1)])';
+                neu.idx_reach_succ = repmat(bhv.suc_inVec,[1 size(neu,1)])';
+                neu.idx_reach_hDCnD = repmat(bhv.suc_inVec,[1 size(neu,1)])';
+                neu.idx_reach_LCR =  repmat(bhv.LCR_inVec_idx,[size(neu,1), 1]);
+                neu.idx_reach_PP =  repmat(bhv.pp_inVec_idx,[size(neu,1), 1]);
+                neu.mouse = repmat(mouse,[size(neu,1),1]);
+                neu.sess = repmat(sess,[size(neu,1),1]);
+
+                neu.reach_px = repmat({bhv.reaches_inVec_px},size(neu,1),1);
+
+                if strcmp(region,'CB')
+                    neu_reg = neu;
+                else
+                    neu_reg = neu(matches(neu.reg,regi),:);
+                end
+                neu_reg.FR_pp_mat = FR_pp_mat';
+                neu_reg.FR_hDCnD_mat = FR_hDCnD';
+                neu_strct = table2struct(neu_reg);
+
+
+                %% Save
+                save(fullfile(save_mat,['neu_',reg,'_struct.mat']),'neu_strct','-v7.3');
+                fprintf('done!!\n')
+
+            end
+        end
+    end
+end
+
+
