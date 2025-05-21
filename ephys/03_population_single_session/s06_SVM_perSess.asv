@@ -37,6 +37,15 @@ bin_width = 0.1;
 bin_step = 0.025;
 n_bins = floor((win_dur/bin_step)-(bin_width/bin_step))+1;
 
+%% Figure defs
+axeOpt = {'linewidth',1.5,'box','off','GridAlpha',...
+    0.05,'ticklength',[1,1]*.01,'fontsize',10, 'TickDir', 'out'};
+clr_center = [72 60 50]./256;
+clr_dom = [48 131 220]./256;
+clr_nondom = [158 216 219]./256;
+clr_init = [63 130 109]./256;
+clrs = [clr_init;clr_dom;clr_center;clr_nondom];
+
 %% SVM - Lood through mice and session
 for m=1:length(animals)
     animal_idx = m;
@@ -124,6 +133,24 @@ for m=1:length(animals)
             s2_r_nD = spk_count_reach(:,(r_DCnD_trials_all == 1 | r_DCnD_trials_all == 2) ...
                 & r_hit_trials_all == 1,:);
 
+            SVM_sess(s).init_s1s2.s1_i_pp = s1_i_pp;
+            SVM_sess(s).init_s1s2.s2_i_pp = s2_i_pp;
+            SVM_sess(s).init_s1s2.s1_i_D = s1_i_D;
+            SVM_sess(s).init_s1s2.s2_i_D = s2_i_D;
+            SVM_sess(s).init_s1s2.s1_i_C = s1_i_C;
+            SVM_sess(s).init_s1s2.s2_i_C = s2_i_C;
+            SVM_sess(s).init_s1s2.s1_i_nD = s1_i_nD;
+            SVM_sess(s).init_s1s2.s2_i_nD = s2_i_nD;
+
+            SVM_sess(s).reach_s1s2.s1_r_pp = s1_r_pp;
+            SVM_sess(s).reach_s1s2.s2_r_pp = s2_r_pp;
+            SVM_sess(s).reach_s1s2.s1_r_D = s1_r_D;
+            SVM_sess(s).reach_s1s2.s2_r_D = s2_r_D;
+            SVM_sess(s).reach_s1s2.s1_r_C = s1_r_C;
+            SVM_sess(s).reach_s1s2.s2_r_C = s2_r_C;
+            SVM_sess(s).reach_s1s2.s1_r_nD = s1_r_nD;
+            SVM_sess(s).reach_s1s2.s1_i_pp = s1_i_pp;
+
             %% %% RUN SVM DECODER
 
             % Parameters
@@ -193,14 +220,6 @@ for m=1:length(animals)
             save_out_dir = fullfile(rootdir,"ephys_and_behavior/","out_files/",group,mouse,sess,reg,'SVM');
             if ~exist(save_out_dir,"dir"), mkdir(save_out_dir); end
 
-            axeOpt = {'linewidth',1.5,'box','off','GridAlpha',...
-                0.05,'ticklength',[1,1]*.01,'fontsize',10, 'TickDir', 'out'};
-            clr_center = [72 60 50]./256;
-            clr_dom = [48 131 220]./256;
-            clr_nondom = [158 216 219]./256;
-            clr_init = [63 130 109]./256;
-            clrs = [clr_init;clr_dom;clr_center;clr_nondom];
-
             %%
             bin_mean=bin_edges(:,1)+diff(bin_edges(1:2));
 
@@ -213,7 +232,7 @@ for m=1:length(animals)
             set(gca,axeOpt{:})
             yline(.5,'--','color',[.7 .7 .7 .7],'LineWidth',1)
             xlim(win_int); ylim([.45 1])
-            title(mouse)
+            title(mouse,'Interpreter','none');
 
             subplot(122)
             for plt=1:4

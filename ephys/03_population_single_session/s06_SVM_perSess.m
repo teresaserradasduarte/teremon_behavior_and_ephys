@@ -108,7 +108,7 @@ for m=1:length(animals)
                     bin_edges(i,2) = bin_stop;
                 end
             end
-            SVM_sess(s).bin_edges = bin_edges;
+            SVM_sess(cc).bin_edges = bin_edges;
 
             %% Init time
             s1_i_pp = spk_count_init(:,i_pp_trials_all == 0,:);
@@ -132,6 +132,24 @@ for m=1:length(animals)
             s1_r_nD = spk_count_reach(:,r_DCnD_trials_all == 3 & r_hit_trials_all == 1,:);
             s2_r_nD = spk_count_reach(:,(r_DCnD_trials_all == 1 | r_DCnD_trials_all == 2) ...
                 & r_hit_trials_all == 1,:);
+
+            SVM_sess(cc).init_s1s2.s1_i_pp = s1_i_pp;
+            SVM_sess(cc).init_s1s2.s2_i_pp = s2_i_pp;
+            SVM_sess(cc).init_s1s2.s1_i_D = s1_i_D;
+            SVM_sess(cc).init_s1s2.s2_i_D = s2_i_D;
+            SVM_sess(cc).init_s1s2.s1_i_C = s1_i_C;
+            SVM_sess(cc).init_s1s2.s2_i_C = s2_i_C;
+            SVM_sess(cc).init_s1s2.s1_i_nD = s1_i_nD;
+            SVM_sess(s).init_s1s2.s2_i_nD = s2_i_nD;
+
+            SVM_sess(cc).reach_s1s2.s1_r_pp = s1_r_pp;
+            SVM_sess(cc).reach_s1s2.s2_r_pp = s2_r_pp;
+            SVM_sess(cc).reach_s1s2.s1_r_D = s1_r_D;
+            SVM_sess(cc).reach_s1s2.s2_r_D = s2_r_D;
+            SVM_sess(cc).reach_s1s2.s1_r_C = s1_r_C;
+            SVM_sess(cc).reach_s1s2.s2_r_C = s2_r_C;
+            SVM_sess(cc).reach_s1s2.s1_r_nD = s1_r_nD;
+            SVM_sess(cc).reach_s1s2.s2_r_nD = s2_r_nD;
 
             %% %% RUN SVM DECODER
 
@@ -229,20 +247,21 @@ for m=1:length(animals)
             set(gcf,'Position',[680         585        1226         393],'Color','w');
             saveas(gcf,strcat(save_out_dir,filesep,'svm_accuracy.png'),'png');
 
+            % Params
+            SVM_sess(cc).params.win_int = win_int;
+            SVM_sess(cc).params.ratio_train_val = ratio_train_val;
+            SVM_sess(cc).params.ncv = ncv;
+            SVM_sess(cc).params.nfold = nfold;
+            SVM_sess(cc).params.Cvec = Cvec;
+            SVM_sess(cc).params.bin_width = bin_width;
+            SVM_sess(cc).params.bin_step = bin_step;
+            % Save mat
+
         end
     end
 end
 fprintf('Saving...\n')
 
-% Params
-SVM_sess(cc).params.win_int = win_int;
-SVM_sess(cc).params.ratio_train_val = ratio_train_val;
-SVM_sess(cc).params.ncv = ncv;
-SVM_sess(cc).params.nfold = nfold;
-SVM_sess(cc).params.Cvec = Cvec;
-SVM_sess(cc).params.bin_width = bin_width;
-SVM_sess(cc).params.bin_step = bin_step;
-% Save mat
 save(strcat(save_mat,filesep,'SVM_sess_',reg,'.mat'),"SVM_sess");
 
 fprintf('Add done!!\n')
