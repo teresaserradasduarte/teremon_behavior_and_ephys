@@ -113,8 +113,8 @@ title('Mean MI in CB')
 %set(gcf,'Color','w','Position',[1967         518        1735         412])
 set(gcf,'Color','w','Position',[2571         396        1168         412])
 
-saveas(gcf,strcat(save_out,filesep,'meanMI_CB_BG.png'),'png')
-print(gcf,strcat(save_out,filesep,'meanMI_CB_BG.pdf'), '-dpdf', '-painters');
+%saveas(gcf,strcat(save_out,filesep,'meanMI_CB_BG.png'),'png')
+%print(gcf,strcat(save_out,filesep,'meanMI_CB_BG.pdf'), '-dpdf', '-painters');
 
 %% PCA
 n_components = 2;
@@ -175,7 +175,21 @@ print(gcf,strcat(save_out,filesep,'PCA1-2_MI.pdf'), '-dpdf', '-painters');
 
 %% 
 
+% AUC
 
+[~, ~, ~, AUC_LL] = perfcurve([zeros(size(diff_lead_lag_BG)); ones(size(diff_lead_lag_CB))],...
+    [diff_lead_lag_BG; diff_lead_lag_CB], 1);
+[~, ~, ~, AUC_EE] = perfcurve([zeros(size(entropy_MIland_BG)); ones(size(entropy_MIland_CB))],...
+    [entropy_MIland_BG; entropy_MIland_CB], 1);
+
+% Significance
+[p_LL, ~, stats_LL] = ranksum(diff_lead_lag_BG, diff_lead_lag_CB);
+[p_EE, ~, stats_EE] = ranksum(entropy_MIland_BG, entropy_MIland_CB);
+
+fprintf('lead-lag: AUC = %.3f | p = %.6f | z = %.3f\n', AUC_LL, p_LL, stats_LL.zval);
+fprintf('entropy : AUC = %.3f | p = %.6f | z = %.3f\n', AUC_EE, p_EE, stats_EE.zval);
+
+%%
 cb_clr = [154,123,193]./255;  
 bg_clr = [106,176,134]./255;   
     bin_size = 0.025; 
@@ -199,6 +213,8 @@ subplot(212)
     bin_size = 0.01; 
 histogram(entropy_MIland_BG,'BinWidth',bin_size,'Normalization','pdf','FaceColor',bg_clr,'EdgeColor','none','FaceAlpha',0.5); hold on
 histogram(entropy_MIland_CB,'BinWidth',bin_size,'Normalization','pdf','FaceColor',cb_clr,'EdgeColor','none','FaceAlpha',0.5);hold off
+xline(mean(entropy_MIland_BG),'-','color',[bg_clr .5],'LineWidth',2)
+xline(mean(entropy_MIland_CB),'-','color',[cb_clr .5],'LineWidth',2)
 xlim([2.5 3.2])
 xline(0,'--','color',[.8 .8 .8],'LineWidth',1.5)
 set(gca,axeOpt{:})

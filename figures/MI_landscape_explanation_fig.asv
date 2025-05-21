@@ -53,7 +53,7 @@ MI_sub = MI_struct(idx_sess);
 MI_land_n = MI_sub(n).MI_landscape;
 
 %%
-sz=20;
+sz=15;
 %fr_lim = [0 30];
 figure
      ff = tiledlayout(3,3);
@@ -71,6 +71,7 @@ figure
         xlabel('time (s)'); ylabel('reach idx');
         set(gca,axeOpt{:});
         %title(xyz_label(nxt))
+colormap(ax1, 'bone')
         c1=colorbar; ylabel(c1,'ML (px)');
 
         nexttile(7)
@@ -87,15 +88,19 @@ figure
         xline(bin_edges(r_start_n),'-','Color',[.8 .8 .8 .5],'LineWidth',1.5);
         xline(bin_edges(r_stop_n),'-','Color',[.8 .8 .8 .5],'LineWidth',1.5);
         xlabel('time (s)'); ylabel('reach idx');
+colormap(ax2, 'bone')
+
         set(gca,axeOpt{:});
         %title(xyz_label(nxt))
         c2=colorbar; ylabel(c2,'instantaneous FR (sp/s)');
 
         nexttile(8)
-        scatter(1:n_r1,neu_FR_win, sz, colors_lcr(water_loc_r1, :), 'filled'); hold off
+        scatter(1:n_r1,neu_FR_win, sz ,colors_lcr(water_loc_r1, :), 'filled'); hold off
+        %scatter(1:n_r1,neu_FR_win,sz,'filled','MarkerFaceColor',[.3 .3 .3]); hold on
+        %scatter(1:n_r1,ones(size(1:n_r1)).*32, sz ,colors_lcr(water_loc_r1, :), 'filled'); hold off
         ylabel('mean FR (sp(s)');
         xlabel('reach idx');
-        ylim([-2 30]);
+        ylim([-2 32]);
         set(gca,axeOpt{:});
 
 
@@ -111,7 +116,7 @@ figure
         hImg = findobj(gca, 'Type', 'image');  % get image object only
         set(hImg, 'AlphaData', alpha_data);
         caxis([min(MI_land_n(:), [], 'omitnan') max(MI_land_n(:), [], 'omitnan')]);
-
+colormap(ax3, 'parula')
         %set(gca, 'YTickDir', 'reverse')
         c=colorbar;
         ylabel(c,'Bits');
@@ -124,12 +129,12 @@ figure
 
     %end
     set(gcf,'Position',[2102         231        1525         505],'color','w');
-    %saveas(ff,strcat(save_out_bhv,filesep,fig_name,'.png'),'png');
+    %saveas(gcf,strcat(save_out_bhv,filesep,fig_name,'.png'),'png');
     %print(gcf,strcat(save_out_bhv,filesep,fig_name,'.pdf'), '-dpdf', '-painters');
 
     %%
     fig_name = 'bhv_and_neuron';
-    
+
 save_out_bhv = 'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_and_behavior\out_files\20230801_ChocolateGroup\5_FerreroRocher\R6\bhv';
   saveas(ff,strcat(save_out_bhv,filesep,fig_name,'.png'),'png');
     print(gcf,strcat(save_out_bhv,filesep,fig_name,'.pdf'), '-dpdf', '-painters');

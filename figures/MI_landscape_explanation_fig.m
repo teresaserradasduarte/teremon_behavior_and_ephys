@@ -53,83 +53,94 @@ MI_sub = MI_struct(idx_sess);
 MI_land_n = MI_sub(n).MI_landscape;
 
 %%
-sz=20;
+sz=15;
 %fr_lim = [0 30];
 figure
-     ff = tiledlayout(3,3);
+ff = tiledlayout(3,3);
 %     title(ff,sprintf('%s%s%s%s','Full reaches | mouse: ',...
 %         mouse, ' | session: ',sess),...
 %         'Interpreter','none');
 
-    %xyz_label = ['x';'y';'z'];
-        ax1=nexttile;
-        ax1.Layout.TileSpan = [2,1];
-        imagesc(tm_reach,1:n_r1, squeeze(reach_r1(:,nxt,:))');
-        xline(0,'--','Color',[1 1 1 .5],'LineWidth',2);
-        xline(tm_reach(r_start),'-','Color',[.5 .5 .5 .5],'LineWidth',1.5);
-        xline(tm_reach(r_stop),'-','Color',[.5 .5 .5 .5],'LineWidth',1.5);
-        xlabel('time (s)'); ylabel('reach idx');
-        set(gca,axeOpt{:});
-        %title(xyz_label(nxt))
-        c1=colorbar; ylabel(c1,'ML (px)');
-
-        nexttile(7)
-        scatter(1:n_r1,endpoint_xyz(2,:), sz, colors_lcr(water_loc_r1, :), 'filled'); hold off
-        ylabel('mean position in ML (px)');
-        xlabel('reach idx');
-        set(gca,axeOpt{:});
-
-        ax2=nexttile(2);
-        ax2.Layout.TileSpan = [2,1];
-        imagesc(tm_reach,1:n_r1, squeeze(reach_r1(:,nxt,:))');
-        imagesc(bin_edges(FR_edges_range),1:n_r1, neu_strct(n).FR_reach(:,r1_idx)',[0 20]);
-        xline(0,'--','Color',[1 1 1 .5],'LineWidth',2);
-        xline(bin_edges(r_start_n),'-','Color',[.8 .8 .8 .5],'LineWidth',1.5);
-        xline(bin_edges(r_stop_n),'-','Color',[.8 .8 .8 .5],'LineWidth',1.5);
-        xlabel('time (s)'); ylabel('reach idx');
-        set(gca,axeOpt{:});
-        %title(xyz_label(nxt))
-        c2=colorbar; ylabel(c2,'instantaneous FR (sp/s)');
-
-        nexttile(8)
-        scatter(1:n_r1,neu_FR_win, sz, colors_lcr(water_loc_r1, :), 'filled'); hold off
-        ylabel('mean FR (sp(s)');
-        xlabel('reach idx');
-        ylim([-2 30]);
-        set(gca,axeOpt{:});
+%xyz_label = ['x';'y';'z'];
+ax1=nexttile;
+ax1.Layout.TileSpan = [2,1];
+imagesc(tm_reach,1:n_r1, squeeze(reach_r1(:,nxt,:))');
+xline(0,'--','Color',[1 1 1 .5],'LineWidth',2);
+xline(tm_reach(r_start),'-','Color',[.5 .5 .5 .5],'LineWidth',1.5);
+xline(tm_reach(r_stop),'-','Color',[.5 .5 .5 .5],'LineWidth',1.5);
+xlabel('time (s)'); ylabel('reach idx');
+set(gca,axeOpt{:});
+%title(xyz_label(nxt))
+colormap(ax1, 'bone')
+c1=colorbar; ylabel(c1,'ML (px)'); hold on
+scatter(ones(size(1:n_r1)).*.125,1:n_r1, 40 ,colors_lcr(water_loc_r1, :), 'filled','Marker','square'); hold off
 
 
-        ax3=nexttile(3);
-        ax3.Layout.TileSpan = [3,1];
-        imagesc(x_im,y_im,MI_land_n);
-        axis xy;        % Invert the y-axis direction
-        hold on
-        plot(win_stop_n_t,win_start_n_t,'ko','LineWidth',.5)
+nexttile(7)
+scatter(1:n_r1,endpoint_xyz(2,:), sz, colors_lcr(water_loc_r1, :), 'filled'); hold off
+ylabel('mean position in ML (px)');
+xlabel('reach idx');
+xlim([1 n_r1])
+set(gca,axeOpt{:});
 
-        alpha_data = ~isnan(MI_land_n);
-        set(gca, 'ALim', [0 1]);
-        hImg = findobj(gca, 'Type', 'image');  % get image object only
-        set(hImg, 'AlphaData', alpha_data);
-        caxis([min(MI_land_n(:), [], 'omitnan') max(MI_land_n(:), [], 'omitnan')]);
+ax2=nexttile(2);
+ax2.Layout.TileSpan = [2,1];
+imagesc(tm_reach,1:n_r1, squeeze(reach_r1(:,nxt,:))');
+imagesc(bin_edges(FR_edges_range),1:n_r1, neu_strct(n).FR_reach(:,r1_idx)',[0 25]);
+xline(0,'--','Color',[1 1 1 .5],'LineWidth',2);
+xline(bin_edges(r_start_n),'-','Color',[.8 .8 .8 .5],'LineWidth',1.5);
+xline(bin_edges(r_stop_n),'-','Color',[.8 .8 .8 .5],'LineWidth',1.5);
+xlabel('time (s)'); ylabel('reach idx');
+colormap(ax2, 'bone')
+hold on
+scatter(ones(size(1:n_r1)).*.99,1:n_r1, 40 ,colors_lcr(water_loc_r1, :), 'filled','Marker','square'); hold off
 
-        %set(gca, 'YTickDir', 'reverse')
-        c=colorbar;
-        ylabel(c,'Bits');
-        xline(0,'--','color',[1 1 1],'LineWidth',1.5)
-        yline(0,'--','color',[1 1 1],'LineWidth',1.5)
-        ylabel('start time (s)'); xlabel('stop time (s)')
-        set(gca,axeOpt{:})
-        axis square
+set(gca,axeOpt{:});
+%title(xyz_label(nxt))
+c2=colorbar; ylabel(c2,'instantaneous FR (sp/s)');
+
+nexttile(8)
+scatter(1:n_r1,neu_FR_win, sz ,colors_lcr(water_loc_r1, :), 'filled'); hold off
+%scatter(1:n_r1,neu_FR_win,sz,'filled','MarkerFaceColor',[.3 .3 .3]); hold on
+%scatter(1:n_r1,ones(size(1:n_r1)).*32, sz ,colors_lcr(water_loc_r1, :), 'filled'); hold off
+ylabel('mean FR (sp(s)');
+xlabel('reach idx');
+xlim([1 n_r1])
+ylim([-2 32]);
+set(gca,axeOpt{:});
 
 
-    %end
-    set(gcf,'Position',[2102         231        1525         505],'color','w');
-    %saveas(ff,strcat(save_out_bhv,filesep,fig_name,'.png'),'png');
-    %print(gcf,strcat(save_out_bhv,filesep,fig_name,'.pdf'), '-dpdf', '-painters');
+ax3=nexttile(3);
+ax3.Layout.TileSpan = [3,1];
+imagesc(x_im,y_im,MI_land_n);
+axis xy;        % Invert the y-axis direction
+hold on
+plot(win_stop_n_t,win_start_n_t,'ko','LineWidth',1,'Marker','square')
 
-    %%
-    fig_name = 'bhv_and_neuron';
-    
+alpha_data = ~isnan(MI_land_n);
+set(gca, 'ALim', [0 1]);
+hImg = findobj(gca, 'Type', 'image');  % get image object only
+set(hImg, 'AlphaData', alpha_data);
+caxis([min(MI_land_n(:), [], 'omitnan') max(MI_land_n(:), [], 'omitnan')]);
+colormap(ax3, 'parula')
+%set(gca, 'YTickDir', 'reverse')
+c=colorbar;
+ylabel(c,'Bits');
+xline(0,'--','color',[1 1 1],'LineWidth',1.5)
+yline(0,'--','color',[1 1 1],'LineWidth',1.5)
+ylabel('start time (s)'); xlabel('stop time (s)')
+set(gca,axeOpt{:})
+axis square
+
+
+%end
+set(gcf,'Position',[2102         231        1525         505],'color','w');
+%saveas(gcf,strcat(save_out_bhv,filesep,fig_name,'.png'),'png');
+%print(gcf,strcat(save_out_bhv,filesep,fig_name,'.pdf'), '-dpdf', '-painters');
+
+%
+fig_name = 'bhv_and_neuron_v2';
+
 save_out_bhv = 'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_and_behavior\out_files\20230801_ChocolateGroup\5_FerreroRocher\R6\bhv';
-  saveas(ff,strcat(save_out_bhv,filesep,fig_name,'.png'),'png');
-    print(gcf,strcat(save_out_bhv,filesep,fig_name,'.pdf'), '-dpdf', '-painters');
+saveas(ff,strcat(save_out_bhv,filesep,fig_name,'.png'),'png');
+print(gcf,strcat(save_out_bhv,filesep,fig_name,'.pdf'), '-dpdf', '-painters');
