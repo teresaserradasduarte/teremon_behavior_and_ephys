@@ -1,6 +1,7 @@
 %% Get neuron struct
 clear; close all; clc
 
+
 %% Manage paths
 person = 'teresa';
 %person = 'simon';
@@ -22,21 +23,21 @@ animals = {...
     'Toblerone',...
     'Milka',...
     'FerreroRocher'};
-animal_idx = 2;
+animal_idx = 3;
 mouse = sprintf('%i_%s',animal_idx,animals{animal_idx});
 ephys_root = strcat(ephys_root,mouse);
 
-session = 'R1';
-ephys_sess = '23082023_Lindt_StrCer_S1_true_g0';
-imec_id = 1; % <---HERE!!!!!
+session = 'R4';
+ephys_sess = '26082023_Toblerone_StrCer_S4_g0';
+imec_id = 0; % <---HERE!!!!!
 
 %catGT_folder = 'catGT_KS_DSRemoved';
 sorter_folder = 'catGT\kilosort4';
 %sorter_folder = 'ibl_sorter_results_default';
-output_folder_name = 'neurons_overview_postFinal';
+output_folder_name = 'neurons_overview';
 
 % To run / save
-show_aux_plots = 0;
+show_aux_plots = 1;
 save_mat_flag = 1;
 plot_neuron_fig = 0;
 use_inferred_reach_times = 0;
@@ -99,6 +100,8 @@ eventTime_ind_down = find(diff([0,syncDat])<-1);
 
 eventTimes_realTrial_ephys = eventTimes_water_giv(2:end);
 eventTimes_realTrial_harp = behavior.sync.time_newTrial_log(2:end);
+
+
 
 if numel(eventTimes_realTrial_ephys)<numel(eventTimes_realTrial_harp)
     if round(sum(diff(eventTimes_realTrial_harp(2:end))-diff(eventTimes_realTrial_ephys))) == 0

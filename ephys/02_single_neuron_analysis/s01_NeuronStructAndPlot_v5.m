@@ -27,20 +27,24 @@ animal_idx = 3;
 mouse = sprintf('%i_%s',animal_idx,animals{animal_idx});
 ephys_root = strcat(ephys_root,mouse);
 
-session = 'R6';
-ephys_sess = '02082023_CoteDorS1CB_g0';
+session = 'R4';
+ephys_sess = '26082023_Toblerone_StrCer_S4_g0';
 imec_id = 0; % <---HERE!!!!!
 
 %catGT_folder = 'catGT_KS_DSRemoved';
 sorter_folder = 'catGT\kilosort4';
 %sorter_folder = 'ibl_sorter_results_default';
-output_folder_name = 'neurons_overview_postFinal';
+output_folder_name = 'neurons_overview';
 
 % To run / save
-show_aux_plots = 0;
+show_aux_plots = 1;
 save_mat_flag = 1;
-plot_neuron_fig = 0;
+plot_neuron_fig = 1;
 use_inferred_reach_times = 0;
+
+% IF A CRASH, wuntil which trial to consider for synccing
+cut_sess_flag = true;
+cut_sess_trial = 118;
 
 % paw pref
 if ismember(animal_idx,[1,4,5])
@@ -101,6 +105,13 @@ eventTime_ind_down = find(diff([0,syncDat])<-1);
 eventTimes_realTrial_ephys = eventTimes_water_giv(2:end);
 eventTimes_realTrial_harp = behavior.sync.time_newTrial_log(2:end);
 
+% In case some crashing happen, and the rest of session needs to be
+% discarted
+if cut_sess_flag == true
+    eventTimes_realTrial_ephys = eventTimes_realTrial_ephys(1:cut_sess_trial);
+    eventTimes_realTrial_harp = eventTimes_realTrial_harp(1:cut_sess_trial);
+end
+
 if numel(eventTimes_realTrial_ephys)<numel(eventTimes_realTrial_harp)
     if round(sum(diff(eventTimes_realTrial_harp(2:end))-diff(eventTimes_realTrial_ephys))) == 0
         eventTimes_realTrial_harp = behavior.sync.time_newTrial_log(3:end);
@@ -123,10 +134,11 @@ if show_aux_plots
     hold off
 
     figure
-    subplot(411), plot(diff(eventTimes_water_giv));
-    subplot(412), plot(diff(eventTime_ind));
-    subplot(413), plot(diff(eventTimes_realTrial_harp));
-    subplot(414), plot(diff(behavior.sync.time_newTrial_log));
+    subplot(511), plot(diff(eventTimes_water_giv));
+    subplot(512), plot(diff(eventTime_ind));
+    subplot(513), plot(diff(behavior.sync.time_newTrial_log));
+    subplot(514), plot(diff(eventTimes_realTrial_ephys));
+    subplot(515), plot(diff(eventTimes_realTrial_harp));
 
     if  numel(eventTimes_realTrial_harp)==numel(behavior.sync.time_newTrial_log(2:end))
         figure
