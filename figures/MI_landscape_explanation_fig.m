@@ -1,4 +1,5 @@
 %%
+rootdir = 'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD';
 mouse = '5_FerreroRocher';
 sess = 'R1';
 load(fullfile(rootdir,"behavior_data/","analyzed_data/mat_files/","20230511_ChocolateGroup/","headfixed_dynamicTarget/",mouse,sess,"session_reaching_data_paw.mat"),'reaches')
