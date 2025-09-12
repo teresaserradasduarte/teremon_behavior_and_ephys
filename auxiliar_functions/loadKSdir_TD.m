@@ -89,20 +89,24 @@ end
 % Quality of clusters: exclude noise
 cgsFile = '';
 cExtraGsFile = '';
-if exist(fullfile(ksDir, 'cluster_groups.csv')) 
+if exist(fullfile(ksDir, 'cluster_groups.csv'),"file") 
     cgsFile = fullfile(ksDir, 'cluster_groups.csv');
 end
-if exist(fullfile(ksDir, 'cluster_group.tsv')) 
+if exist(fullfile(ksDir, 'cluster_group.tsv'),"file") 
    cgsFile = fullfile(ksDir, 'cluster_group.tsv');
 end 
-if exist(fullfile(ksDir, 'cluster_Extragood.tsv')) 
+if exist(fullfile(ksDir, 'cluster_Extragood.tsv'),"file") 
    cExtraGsFile = fullfile(ksDir, 'cluster_Extragood.tsv');
+elseif exist(fullfile(ksDir, 'cluster_extragood.tsv'),"file") 
+   cExtraGsFile = fullfile(ksDir, 'cluster_extragood.tsv');
 else
     cegs = zeros(size(unique(spikeTemplates)));
 end 
 
-if exist(fullfile(ksDir, 'cluster_CS.tsv')) 
+if exist(fullfile(ksDir, 'cluster_CS.tsv'),"file")
    potential_CSFile = fullfile(ksDir, 'cluster_CS.tsv');
+elseif exist(fullfile(ksDir, 'cluster_potential_CS.tsv'),"file")
+    potential_CSFile = fullfile(ksDir, 'cluster_potential_CS.tsv');
 else
     potential_CSFile = [];
 end

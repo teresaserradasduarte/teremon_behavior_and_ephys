@@ -1,7 +1,6 @@
 %% Get neuron struct
 clear; close all; clc
 
-
 %% Manage paths
 person = 'teresa';
 %person = 'simon';
@@ -23,29 +22,31 @@ animals = {...
     'Toblerone',...
     'Milka',...
     'FerreroRocher'};
-animal_idx = 3;
+animal_idx = 1;
 mouse = sprintf('%i_%s',animal_idx,animals{animal_idx});
 ephys_root = strcat(ephys_root,mouse);
 
-session = 'R4';
-ephys_sess = '26082023_Toblerone_StrCer_S4_g0';
+session = 'R5';
+ephys_sess = '04082023_CoteDor_Cer_S5_g0';
 imec_id = 0; % <---HERE!!!!!
 
 %catGT_folder = 'catGT_KS_DSRemoved';
-sorter_folder = 'catGT\kilosort4';
-%sorter_folder = 'ibl_sorter_results_default';
-output_folder_name = 'neurons_overview';
+%sorter_folder = 'catGT\kilosort4';
+sorter_folder = 'ibl_sorter_results_driftAdapt40';
+output_folder_name = 'neurons_overview_shorterStart2';
 
+%% PARAMETERS TO DEFINE!!
 % To run / save
 show_aux_plots = 1;
-save_mat_flag = 1;
+save_mat_flag = 0;
 plot_neuron_fig = 1;
 use_inferred_reach_times = 0;
 
-% IF A CRASH, wuntil which trial to consider for synccing
-cut_sess_flag = true;
-cut_sess_trial = 118;
+% IF CRASHED, until which trial to consider for synccing (USED FOR SYNCING ONLY)
+cut_sess_sync_flag = false;
+cut_sess_trial_sync = 197;
 
+%% Probe side
 % paw pref
 if ismember(animal_idx,[1,4,5])
     paw_pref = 'R';
@@ -74,6 +75,7 @@ out_ephys_folder = strcat(myKsDir,filesep,output_folder_name);
 if ~exist(out_ephys_folder,'dir'), mkdir(out_ephys_folder); end
 % load behavior data
 load(strcat(behavior_path,filesep,'behavior_session.mat'));
+
 
 % load kilosort output with spikes and metadata
 tic
@@ -107,9 +109,9 @@ eventTimes_realTrial_harp = behavior.sync.time_newTrial_log(2:end);
 
 % In case some crashing happen, and the rest of session needs to be
 % discarted
-if cut_sess_flag == true
-    eventTimes_realTrial_ephys = eventTimes_realTrial_ephys(1:cut_sess_trial);
-    eventTimes_realTrial_harp = eventTimes_realTrial_harp(1:cut_sess_trial);
+if cut_sess_sync_flag == true
+    eventTimes_realTrial_ephys = eventTimes_realTrial_ephys(1:cut_sess_trial_sync);
+    eventTimes_realTrial_harp = eventTimes_realTrial_harp(1:cut_sess_trial_sync);
 end
 
 if numel(eventTimes_realTrial_ephys)<numel(eventTimes_realTrial_harp)
@@ -121,10 +123,6 @@ if numel(eventTimes_realTrial_ephys)<numel(eventTimes_realTrial_harp)
     end
     fprintf('Removed the first trial from behavior! \n')
 end
-
-f=fit(eventTimes_realTrial_ephys,eventTimes_realTrial_harp,'poly1');
-tm_bhv2ephys =  @(eventTimes_realTrial_ephys)  f.p2+f.p1*eventTimes_realTrial_ephys;
-toc
 
 if show_aux_plots
     figure
@@ -139,7 +137,14 @@ if show_aux_plots
     subplot(513), plot(diff(behavior.sync.time_newTrial_log));
     subplot(514), plot(diff(eventTimes_realTrial_ephys));
     subplot(515), plot(diff(eventTimes_realTrial_harp));
+end
 
+% FIT
+f=fit(eventTimes_realTrial_ephys,eventTimes_realTrial_harp,'poly1');
+tm_bhv2ephys =  @(eventTimes_realTrial_ephys)  f.p2+f.p1*eventTimes_realTrial_ephys;
+toc
+
+if show_aux_plots
     if  numel(eventTimes_realTrial_harp)==numel(behavior.sync.time_newTrial_log(2:end))
         figure
         plot(eventTimes_water_giv,behavior.sync.time_newTrial_log,'-'); hold on
@@ -191,6 +196,11 @@ behav_stop = behavior.behavior_duration.time_end + behav_start;
 behavior_end_timelog = behavior.behavior_duration.time_end;
 all_st = tm_bhv2ephys(sp.st);
 st_behaviorEpochBool = all_st>behav_start & all_st<behav_stop;
+
+if show_aux_plots
+figure
+plot(st_behaviorEpochBool);
+end
 
 
 
@@ -274,6 +284,7 @@ toc
 % trials
 nr_trials = behavior.behavior_duration.trial_end;
 trials_vec = 1:nr_trials;
+select_trials = initiation_times>behav_start;
 
 % events
 initiation_times = behavior.inputs.read_log(behavior.logs.trial_init_ind(trials_vec),1);
@@ -379,7 +390,7 @@ figProp.invalid_clr_fc = [.8 .8 .8];
 fprintf('Align activity to behavior...\n')
 tic
 for un = 1: length(neurons)
-    %un = 90;
+    %un = 1;
     if ~isempty(neurons(un).st_raw)
 
         %un=1;
