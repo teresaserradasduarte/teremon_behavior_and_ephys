@@ -3,8 +3,8 @@ clear; close all; clc
 
 %% Load data
 
-person = 'teresa';
-%person = 'simon';
+%person = 'teresa';
+person = 'simon';
 if strcmp(person,'teresa')
     raw_folder = 'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\data\TD\behavior_data\raw_data';
 elseif strcmp(person,'simon')
@@ -18,20 +18,20 @@ animals = {...
     'Toblerone',...
     'Milka',...
     'FerreroRocher'};
-animal_idx = 4;
+animal_idx = 3;
 mouse = sprintf('%i_%s',animal_idx,animals{animal_idx});
 % R:-1 |C:0 | L:1
 
         
 % SESSION
-session = 'R3';
+session = 'R4';
 flag_no_sync = 0;
 
 % DISPLAY LENGTH
 % Sherten session to display (discart unengaged trials)
-shorten_display = 0;
+shorten_display = 1;
 %last_trial_disp_time = 38; % minutes
-last_trial_disp = 131; % trial idx
+last_trial_disp = 116; % trial idx
 
 %% Path
 %session = char(PP_sess(s));
