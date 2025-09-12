@@ -46,6 +46,10 @@ use_inferred_reach_times = 0;
 cut_sess_sync_flag = false;
 cut_sess_trial_sync = 197;
 
+% IF STARTS BADLY, cut the session start
+cut_start_flag = true;
+cut_start_time_in_sec = 200;
+
 %% Probe side
 % paw pref
 if ismember(animal_idx,[1,4,5])
@@ -191,14 +195,20 @@ end
 nOfUnits = numel(uniqueUnits);
 
 % Find the duration of the behavior session with engagement
-behav_start = behavior.behavior_duration.time_start;
+if cut_start_flag == true
+    behav_start = behavior.behavior_duration.time_start + cut_start_time_in_sec;
+else
+    behav_start = behavior.behavior_duration.time_start;
+end
 behav_stop = behavior.behavior_duration.time_end + behav_start;
 behavior_end_timelog = behavior.behavior_duration.time_end;
 all_st = tm_bhv2ephys(sp.st);
 st_behaviorEpochBool = all_st>behav_start & all_st<behav_stop;
 
-if show_aux_plots
+if show_aux_plots && cut_start_flag
 figure
+st_before_cut = all_st>behavior.behavior_duration.time_start & all_st<behav_stop;
+plot(st_before_cut); hold on
 plot(st_behaviorEpochBool);
 end
 
@@ -285,6 +295,7 @@ toc
 nr_trials = behavior.behavior_duration.trial_end;
 trials_vec = 1:nr_trials;
 select_trials = initiation_times>behav_start;
+start_trial = find((select_trials)==1,1,'first');
 
 % events
 initiation_times = behavior.inputs.read_log(behavior.logs.trial_init_ind(trials_vec),1);
@@ -299,12 +310,23 @@ else
     reach_times = behavior.reach.timeof.reach_time_corrected(trials_vec) + behavior.behavior_duration.time_start;
 end
 
+if cut_start_flag
+    initiation_times = initiation_times(select_trials);
+    reach_times = reach_times(select_trials);
+end
+
+
 % idx
-push_idx = behavior.init.idx_trial_push(behavior.init.idx_trial_push<=nr_trials);
-pull_idx = behavior.init.idx_trial_pull(behavior.init.idx_trial_pull<=nr_trials);
-left_idx = behavior.reach.left_idx(behavior.reach.left_idx<=nr_trials);
-right_idx = behavior.reach.right_idx(behavior.reach.right_idx<=nr_trials);
-center_idx = behavior.reach.center_idx(behavior.reach.center_idx<=nr_trials);
+push_idx = behavior.init.idx_trial_push(behavior.init.idx_trial_push>=start_trial ...
+    & behavior.init.idx_trial_push<=nr_trials);
+pull_idx = behavior.init.idx_trial_pull(behavior.init.idx_trial_pull>=start_trial ...
+    & behavior.init.idx_trial_pull<=nr_trials);
+left_idx = behavior.reach.left_idx(behavior.reach.left_idx>=start_trial ... 
+    & behavior.reach.left_idx<=nr_trials);
+right_idx = behavior.reach.right_idx(behavior.reach.right_idx>=start_trial ... 
+    & behavior.reach.right_idx<=nr_trials);
+center_idx = behavior.reach.center_idx(behavior.reach.center_idx>=start_trial ...
+    & behavior.reach.center_idx<=nr_trials);
 
 % gamma for PSTH
 peak_x = .05;
@@ -389,8 +411,8 @@ figProp.invalid_clr_fc = [.8 .8 .8];
 %% Run through units
 fprintf('Align activity to behavior...\n')
 tic
-for un = 1: length(neurons)
-    %un = 1;
+%for un = 1: length(neurons)
+    un = 1;
     if ~isempty(neurons(un).st_raw)
 
         %un=1;
@@ -774,7 +796,7 @@ for un = 1: length(neurons)
             end
         end
     end
-end
+%end
 toc
 
 %% SAVE MAT
