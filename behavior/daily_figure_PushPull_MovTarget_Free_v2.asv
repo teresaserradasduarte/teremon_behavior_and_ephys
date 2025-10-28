@@ -18,20 +18,20 @@ animals = {...
     'Toblerone',...
     'Milka',...
     'FerreroRocher'};
-animal_idx = 1;
+animal_idx = 4;
 mouse = sprintf('%i_%s',animal_idx,animals{animal_idx});
 % R:-1 |C:0 | L:1
 
         
 % SESSION
-session = 'R5';
+session = 'R7';
 flag_no_sync = 0;
 
 % DISPLAY LENGTH
 % Sherten session to display (discart unengaged trials)
 shorten_display = 0;
-last_trial_disp_time = 35; % minutes
-%last_trial_disp = 120; % trial idx
+%last_trial_disp_time = 35; % minutes
+%last_trial_disp = 131; % trial idx
 
 %% Path
 %session = char(PP_sess(s));
@@ -43,7 +43,7 @@ searchstr_log = '*GlobalLogInt';
 searchstr_load_cells = '*paws_loadCells';
 searchstr_cam = '*Camera1Timestamp';
 searchstr_water_pos = '*WaterPosition_steps';
-searchstr_syncfix = '*syncfix';
+searchstr_syncfix = '*syncfixNO'; % remove the NO if what to use
 
 
 % Files
@@ -121,6 +121,7 @@ end
 logs = read_log(:,2);
 sess_start_ind = find(logs==1001); sess_start_ind = sess_start_ind(1);
 timelog = read_log(:,1)-read_log(sess_start_ind,1);
+timelog(timelog<0)=nan;
 session_duration = read_log(end-1,1)-read_log(sess_start_ind,1); % in sec
 
 
@@ -131,8 +132,13 @@ syncCam = read_cam(:,1);
 % exclude jumps (bug)
 to_exclude_down = find(diff(syncCam)<-2.148E9);
 to_exclude_up = find(diff(syncCam)>2.148E9);
+to_exclude_frame = find(syncCam==0);
+syncCam(to_exclude_frame)=syncCam(to_exclude_frame-1); 
 syncCam(to_exclude_down)=syncCam(to_exclude_down-1);
 syncCam(to_exclude_up)=syncCam(to_exclude_up+1);
+if (~isempty(to_exclude_down) || ~isempty(to_exclude_frame))
+    writematrix(syncCam,strcat(rootdir,filesep,'new_cam_metadata.csv'), 'Delimiter', ' ');
+end
 
 ind_newTrial_event = find((diff([0;syncCam])~=0));
 ind_newTrial_event_up = find((diff([0;syncCam])>1));
@@ -251,6 +257,7 @@ transition_2push = transition_push_pull(is_push(transition_push_pull+1)==1);
 transition_2pull = transition_push_pull(is_push(transition_push_pull+1)==0);
 
 % Bounds
+if pull
 push_bounds_tmp = sort([idx_comp_trial_push(1); ...
     idx_comp_trial_push(diff(idx_comp_trial_push)>1);...
     idx_comp_trial_push(find(diff(idx_comp_trial_push)>1)+1);...
@@ -370,6 +377,7 @@ end
 
 
 % Time of valid/invalid push pull
+%idx_comp_trial_push = idx_comp_trial_push<length(init_time);
 valPush_time = init_time(idx_comp_trial_push);
 valPull_time = init_time(idx_comp_trial_pull);
 invalPush_time = timelog(inval_push_ind);
@@ -384,6 +392,7 @@ end
 
 %% Time (duration) to...
 % Time to reach/init/iti (durations)
+trial_available_time = trial_available_time(1:length(init_time));
 time_to_init = init_time-trial_available_time;
 time_to_reach = reach_time-water_delivery_time;
 time_to_reach_corrected = reach_time_corrected - water_delivery_time;
@@ -465,6 +474,10 @@ end
 for j=1:size(push_bounds,2)
     ispush_slide_vec(units_slide>init_time(push_bounds(1,j)) & units_slide<init_time(push_bounds(2,j))) = 1;
 end
+if (push_bounds(1,1)==1 && ispush_slide_vec(1)==0)
+    ispush_slide_vec(units_slide<init_time(push_bounds(2,1))) = 1;
+end
+
 
 count_valPush_per_unit = count_Push_per_unit;
 count_invalPush_per_unit = count_Push_per_unit;
@@ -570,7 +583,7 @@ sum_gen_force_init_early=nansum(abs(paw_ITI_play(1:3000,:)));
 
 
 
-%% DAILY FIGURE - THIS WILL BE REMOVED I THINK
+%% DAILY FIGURE
 close all
 % Figures handles
 figOpt = {'color','w','position',[1921          46        1920         963]};

@@ -23,10 +23,12 @@ if patchY.extend
     %patches
     pus=behavior.init.timeof.init_time(behavior.init.push_bounds)./60;
     pul=behavior.init.timeof.init_time(behavior.init.pull_bounds)./60;
-    if behavior.init.pull_bounds(end)>behavior.init.push_bounds(end)
-        pul(end)=behavior.session_duration/60;
-    elseif behavior.init.pull_bounds(end)<behavior.init.push_bounds(end)
-        pus(end)=behavior.session_duration/60;
+    if (~isempty(pul) && ~isempty(pus))
+        if behavior.init.pull_bounds(end)>behavior.init.push_bounds(end)
+            pul(end)=behavior.session_duration/60;
+        elseif behavior.init.pull_bounds(end)<behavior.init.push_bounds(end)
+            pus(end)=behavior.session_duration/60;
+        end
     end
 end
 
@@ -59,20 +61,27 @@ plot([xlin_r,xlin_r]',ylim(ax),'-.', 'Color',figProp.transitionBarClr,'linewidth
 plot([xlin_c,xlin_c]',ylim(ax),'-.', 'Color',figProp.transitionBarClr,'linewidth',figProp.lw_lcrT);
 
 % trasition bars
-plot([xlin_push,xlin_push]',ylim(ax), 'Color',figProp.transitionBarClr,'linewidth',figProp.lw_ppT);
-plot([xlin_pull,xlin_pull]',ylim(ax), 'Color',figProp.transitionBarClr,'linewidth',figProp.lw_ppT);
+if ~isempty(xlin_push), plot([xlin_push,xlin_push]',ylim(ax), 'Color',figProp.transitionBarClr,'linewidth',figProp.lw_ppT); end
+if ~isempty(xlin_pull), plot([xlin_pull,xlin_pull]',ylim(ax), 'Color',figProp.transitionBarClr,'linewidth',figProp.lw_ppT); end
 
 if patchY.showPatch
     % patch push/pull
-    for l=1:size(pus,2)
-        pa_pus = patch([pus(1,l) pus(1,l) pus(2,l) pus(2,l)],...
-            patchY.pp,behavior.colors.push_clr,'FaceAlpha',figProp.pa_pp_alpha,'EdgeColor','none'); hold on
+    if ~isempty(pus)
+        for l=1:size(pus,2)
+            pa_pus = patch([pus(1,l) pus(1,l) pus(2,l) pus(2,l)],...
+                patchY.pp,behavior.colors.push_clr,'FaceAlpha',figProp.pa_pp_alpha,'EdgeColor','none'); hold on
+        end
+    else
+        pa_pus=[];
     end
-    for l=1:size(pul,2)
-        pa_pul = patch([pul(1,l) pul(1,l) pul(2,l) pul(2,l)],...
-            patchY.pp,behavior.colors.pull_clr,'FaceAlpha',figProp.pa_pp_alpha,'EdgeColor','none'); hold on
+    if ~isempty(pul)
+        for l=1:size(pul,2)
+            pa_pul = patch([pul(1,l) pul(1,l) pul(2,l) pul(2,l)],...
+                patchY.pp,behavior.colors.pull_clr,'FaceAlpha',figProp.pa_pp_alpha,'EdgeColor','none'); hold on
+        end
+    else
+        pa_pul=[];
     end
-
     % patch left/center/right
     for l=1:size(ll,2)
         pa_l = patch([ll(1,l) ll(1,l) ll(2,l) ll(2,l)],patchY.rlc,behavior.colors.left_color,...

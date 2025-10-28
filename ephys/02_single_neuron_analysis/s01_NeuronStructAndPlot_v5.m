@@ -22,29 +22,34 @@ animals = {...
     'Toblerone',...
     'Milka',...
     'FerreroRocher'};
-animal_idx = 1;
+animal_idx = 4;
 mouse = sprintf('%i_%s',animal_idx,animals{animal_idx});
 ephys_root = strcat(ephys_root,mouse);
 
-session = 'R5';
-ephys_sess = '04082023_CoteDor_Cer_S5_g0';
-imec_id = 0; % <---HERE!!!!!
+session = 'R7';
+ephys_sess = '21082023_Milka_StrCer_S7_g0';
+imec_id = 1; % <---HERE!!!!!
 
 %catGT_folder = 'catGT_KS_DSRemoved';
 %sorter_folder = 'catGT\kilosort4';
-sorter_folder = 'ibl_sorter_results_driftAdapt40';
-output_folder_name = 'neurons_overview_shorterStart2';
+sorter_folder = 'ibl_sorter_results';
+output_folder_name = 'neurons_overview';
 
 %% PARAMETERS TO DEFINE!!
 % To run / save
 show_aux_plots = 1;
-save_mat_flag = 0;
+save_mat_flag = 1;
 plot_neuron_fig = 1;
 use_inferred_reach_times = 0;
 
-% IF CRASHED, until which trial to consider for synccing (USED FOR SYNCING ONLY)
+% IF CRASHED, until which trial to consider for synccing (USED FOR SYNCING
+% ONLY) or which trials to exclude
 cut_sess_sync_flag = false;
-cut_sess_trial_sync = 197;
+flag_remove_initial_trials_sync = false;
+%cut_sess_trial_sync = 197;
+
+neurons_params.flags_syncExeption.cut_sess_sync_flag = cut_sess_sync_flag;
+neurons_params.flags_syncExeption.flag_remove_initial_trials_sync = flag_remove_initial_trials_sync;
 
 %% Probe side
 % paw pref
@@ -130,6 +135,25 @@ if show_aux_plots
     hold on
     plot(eventTime_ind,ones(size(eventTime_ind)).*64,'*')
     hold off
+
+    figure
+    subplot(511), plot(diff(eventTimes_water_giv));
+    subplot(512), plot(diff(eventTime_ind));
+    subplot(513), plot(diff(behavior.sync.time_newTrial_log));
+    subplot(514), plot(diff(eventTimes_realTrial_ephys));
+    subplot(515), plot(diff(eventTimes_realTrial_harp));
+end
+
+% IF something in the beginning of the session good weird, exclude first
+% trials, defined here where to start -- very manual, i know :(
+if flag_remove_initial_trials_sync==true
+    first_ephys = 6;
+    first_harp = 4;
+    neurons_params.trials_cut_init.first_ephys = first_ephys;
+    neurons_params.trials_cut_init.first_harp = first_harp;
+
+    eventTimes_realTrial_ephys = eventTimes_realTrial_ephys(first_ephys:end);
+    eventTimes_realTrial_harp = eventTimes_realTrial_harp(first_harp:end);
 
     figure
     subplot(511), plot(diff(eventTimes_water_giv));
@@ -284,7 +308,6 @@ toc
 % trials
 nr_trials = behavior.behavior_duration.trial_end;
 trials_vec = 1:nr_trials;
-select_trials = initiation_times>behav_start;
 
 % events
 initiation_times = behavior.inputs.read_log(behavior.logs.trial_init_ind(trials_vec),1);
@@ -338,6 +361,7 @@ neurons_params.crosscorrelogram.binsize_CC = binsize_CC;
 neurons_params.crosscorrelogram.duration_CC = duration_CC;
 neurons_params.isi.isi_bins = isi_bins;
 neurons_params.isi.isi_bins_cs = isi_bins_cs;
+
 
 %% FIGURE PROPERTIES
 % axis and colors
@@ -440,7 +464,7 @@ for un = 1: length(neurons)
         psth_push = mean(neurons(un).spk_rates_init(:,push_idx),2);
         psth_pull = mean(neurons(un).spk_rates_init(:,pull_idx),2);
         if length(push_idx)<2, psth_push=nan(size(psth_push)); end
-        if length(pull_idx)<2, psth_pull=nan(psth_pull); end
+        if length(pull_idx)<2, psth_pull=nan(size(psth_pull)); end
         psth_push_sem = std(neurons(un).spk_rates_init(:,push_idx),[],2)./length(push_idx);
         psth_pull_sem = std(neurons(un).spk_rates_init(:,pull_idx),[],2)./length(pull_idx);
 
@@ -564,8 +588,8 @@ for un = 1: length(neurons)
                 scatter(cell2mat(neurons(un).st_init),cell2mat(neurons(un).spk_trials_init),spk_size,'k.'), hold on
                 scatter(neurons(un).reach_in_init,trials_vec,event_size,'filled','MarkerFaceColor',rcl_clr)
                 scatter(zeros(size(trials_vec)),trials_vec,event_size,'filled','MarkerFaceColor',pp_clr)
-                plot(line_x,pull_bounds,'linewidth',patch_wd,'color',pull_clr)
-                plot(line_x,push_bounds,'linewidth',patch_wd,'color',push_clr)
+                if ~isempty(pull_bounds), plot(line_x,pull_bounds,'linewidth',patch_wd,'color',pull_clr); end
+                if ~isempty(push_bounds), plot(line_x,push_bounds,'linewidth',patch_wd,'color',push_clr); end
                 hold off
                 axis tight;
                 xlabel('time from trial init (s)'); ylabel('trials in session')
