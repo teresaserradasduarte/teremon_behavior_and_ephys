@@ -3,8 +3,8 @@ clear; close all; clc
 
 %% Load data
 
-person = 'teresa';
-%person = 'simon';
+%person = 'teresa';
+person = 'simon';
 if strcmp(person,'teresa')
     raw_folder = 'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\data\TD\behavior_data\raw_data';
 elseif strcmp(person,'simon')
@@ -18,13 +18,14 @@ animals = {...
     'Toblerone',...
     'Milka',...
     'FerreroRocher'};
-animal_idx = 4;
+animal_idx = 3;
 mouse = sprintf('%i_%s',animal_idx,animals{animal_idx});
 % R:-1 |C:0 | L:1
 
         
 % SESSION
 session = 'R7';
+
 flag_no_sync = 0;
 
 % DISPLAY LENGTH
@@ -32,6 +33,7 @@ flag_no_sync = 0;
 shorten_display = 0;
 %last_trial_disp_time = 35; % minutes
 %last_trial_disp = 131; % trial idx
+
 
 %% Path
 %session = char(PP_sess(s));
@@ -137,7 +139,8 @@ syncCam(to_exclude_frame)=syncCam(to_exclude_frame-1);
 syncCam(to_exclude_down)=syncCam(to_exclude_down-1);
 syncCam(to_exclude_up)=syncCam(to_exclude_up+1);
 if (~isempty(to_exclude_down) || ~isempty(to_exclude_frame))
-    writematrix(syncCam,strcat(rootdir,filesep,'new_cam_metadata.csv'), 'Delimiter', ' ');
+    new_cam_file = cat(2,syncCam,read_cam(:,2:end));
+    writematrix(new_cam_file,strcat(rootdir,filesep,'new_cam_metadata.csv'), 'Delimiter', ' ');
 end
 
 ind_newTrial_event = find((diff([0;syncCam])~=0));
@@ -257,18 +260,24 @@ transition_2push = transition_push_pull(is_push(transition_push_pull+1)==1);
 transition_2pull = transition_push_pull(is_push(transition_push_pull+1)==0);
 
 % Bounds
-if pull
-push_bounds_tmp = sort([idx_comp_trial_push(1); ...
-    idx_comp_trial_push(diff(idx_comp_trial_push)>1);...
-    idx_comp_trial_push(find(diff(idx_comp_trial_push)>1)+1);...
-    idx_comp_trial_push(end)]);
-push_bounds =  reshape(push_bounds_tmp,[2 length(push_bounds_tmp)/2]);
-pull_bounds_tmp = sort([idx_comp_trial_pull(1); ...
-    idx_comp_trial_pull(diff(idx_comp_trial_pull)>1);...
-    idx_comp_trial_pull(find(diff(idx_comp_trial_pull)>1)+1);...
-    idx_comp_trial_pull(end)]);
-pull_bounds =  reshape(pull_bounds_tmp,[2 length(pull_bounds_tmp)/2]);
-
+if ~isempty(idx_comp_trial_push)
+    push_bounds_tmp = sort([idx_comp_trial_push(1); ...
+        idx_comp_trial_push(diff(idx_comp_trial_push)>1);...
+        idx_comp_trial_push(find(diff(idx_comp_trial_push)>1)+1);...
+        idx_comp_trial_push(end)]);
+    push_bounds =  reshape(push_bounds_tmp,[2 length(push_bounds_tmp)/2]);
+else
+    push_bounds = [];
+end
+if ~isempty(idx_comp_trial_pull)
+    pull_bounds_tmp = sort([idx_comp_trial_pull(1); ...
+        idx_comp_trial_pull(diff(idx_comp_trial_pull)>1);...
+        idx_comp_trial_pull(find(diff(idx_comp_trial_pull)>1)+1);...
+        idx_comp_trial_pull(end)]);
+    pull_bounds =  reshape(pull_bounds_tmp,[2 length(pull_bounds_tmp)/2]);
+else
+    pull_bounds = [];
+end
 
 %% Moving water 
 % Find when water was moved and where to
