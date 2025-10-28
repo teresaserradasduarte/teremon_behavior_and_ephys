@@ -3,8 +3,8 @@ clear; close all; clc
 
 %% Load data
 
-person = 'teresa';
-%person = 'simon';
+%person = 'teresa';
+person = 'simon';
 if strcmp(person,'teresa')
     raw_folder = 'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\data\TD\behavior_data\raw_data';
 elseif strcmp(person,'simon')
@@ -32,6 +32,7 @@ flag_no_sync = 0;
 shorten_display = 0;
 %last_trial_disp_time = 35; % minutes
 %last_trial_disp = 131; % trial idx
+
 
 %% Path
 %session = char(PP_sess(s));
