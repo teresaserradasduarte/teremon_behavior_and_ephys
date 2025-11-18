@@ -133,7 +133,6 @@ right1_mean = mean(reach_choice(:,:,right_cat1_idx),3,"omitnan");
 
 
 %% Plot
-
 transpa = .03;
 lw = 2.5;
 lw_med = 2.5;

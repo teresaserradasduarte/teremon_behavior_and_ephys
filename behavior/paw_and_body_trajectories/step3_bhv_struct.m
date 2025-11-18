@@ -1,0 +1,319 @@
+%% REACHING SESSION ANALYSIS 3
+% Step 3: Save in struct most relevant bhv params for EPHYS+BHV!
+% plot reaches per target location 
+clear; close all; clc
+
+%% Load data & params
+% Group and individual
+group = '20230511_ChocolateGroup';
+group_ephys = '20230801_ChocolateGroup';
+setup = 'headfixed_dynamicTarget';
+animals = {...
+    'CoteDor',...
+    'Lindt',...
+    'Toblerone',...
+    'Milka',...
+    'FerreroRocher'};
+animal_idx = 1;
+mouse = sprintf('%i_%s',animal_idx,animals{animal_idx});
+sess = 'R7';
+
+
+%% paths
+rootdir = 'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD';
+behavior_dir = fullfile(rootdir,"behavior_data","raw_data",group,setup,mouse,sess);
+reaching_dir = fullfile(rootdir,"behavior_data","analyzed_data","mat_files",group,setup,mouse,sess);
+
+% Load mat files
+load(fullfile(behavior_dir,"behavior_session.mat"));
+load(fullfile(reaching_dir,"session_reaching_data_paw.mat"));
+
+% Save output: save figs in behavior only, save mat in ephys+bhv!!!!!
+save_name = 'targets_reaching';
+save_mat = fullfile(rootdir,"ephys_and_behavior","mat_files",group_ephys,mouse,sess);
+save_out = fullfile(rootdir,"behavior_data","analyzed_data","output_files",group,setup,mouse,sess,save_name);
+if ~exist(save_mat,"dir"), mkdir(save_mat); end
+if ~exist(save_out,"dir"), mkdir(save_out); end
+
+%% Get event time from behavior
+% Win of good behavior + ehpys
+behav_start = behavior.behavior_duration.time_start;
+behav_stop = behavior.behavior_duration.time_end + behav_start;
+last_trial = behavior.behavior_duration.trial_end;
+first_trial = 1;
+trials_vec = first_trial:last_trial;
+
+% Trial identity defined by logs
+push_idx_all = behavior.init.idx_trial_push;
+pull_idx_all = behavior.init.idx_trial_pull;
+left_idx_all = behavior.reach.left_idx;
+right_idx_all = behavior.reach.right_idx;
+center_idx_all = behavior.reach.center_idx;
+
+% Event times from logs - trial init
+initiation_times_all = behavior.inputs.read_log(behavior.logs.trial_init_ind,1);
+select_start_time = initiation_times_all(first_trial);
+time_sess_end = behav_stop+10;
+inva_push_times_all = behavior.inputs.read_log(behavior.logs.inval_push_ind,1);
+inva_pull_times_all = behavior.inputs.read_log(behavior.logs.inval_pull_ind,1);
+
+% event times from reaches
+reach_times = reaches.reach_timestamps_mat(:,reaches.reach_params.reach_interval.max_reach);
+n_reach = length(reach_times);
+
+% reach identities
+reach_trials = reaches.reach_trial-1;
+is_success = reaches.success_reach==1;
+is_hit = reaches.hit_reach==1;
+is_purpose = reaches.purpose_reach==1;
+cat_reach = reaches.cat_reach;
+
+%% Events within selected trials window
+% trial identities
+push_idx = push_idx_all(push_idx_all >= first_trial & ...
+    push_idx_all<last_trial);
+pull_idx = pull_idx_all(pull_idx_all >= first_trial & ...
+    pull_idx_all<last_trial);
+left_idx = left_idx_all(left_idx_all >= first_trial & ...
+    left_idx_all<last_trial);
+right_idx = right_idx_all(right_idx_all >= first_trial & ...
+    right_idx_all<last_trial);
+center_idx = center_idx_all(center_idx_all >= first_trial & ...
+    center_idx_all<last_trial);
+% Convert L/R to Dom/non-Dom
+if strcmp(mouse_info.paw_pref,'R')
+    dom_idx = right_idx;
+    nondom_idx = left_idx;
+elseif strcmp(mouse_info.paw_pref,'L')
+    dom_idx = left_idx;
+    nondom_idx = right_idx;
+end
+
+% Event times
+initiation_times = initiation_times_all(initiation_times_all >= select_start_time & ...
+    initiation_times_all < time_sess_end);
+inva_push_times = inva_push_times_all(inva_push_times_all >= select_start_time & ...
+    inva_push_times_all < time_sess_end);
+inva_pull_times = inva_pull_times_all(inva_pull_times_all >= select_start_time & ...
+    inva_pull_times_all < time_sess_end);
+pp_times = cat(1,initiation_times,inva_push_times,inva_pull_times);
+init_invPush_invPull_idx = cat(1,ones(length(initiation_times),1),...
+    ones(length(inva_push_times),1)*2,ones(length(inva_pull_times),1)*3);
+nr_pp_events = length(pp_times);
+valPushPull_invalPushPull_idx = init_invPush_invPull_idx;
+valPushPull_invalPushPull_idx(push_idx)=0;
+
+
+% Idx of reaches within win
+reach_inVec_idx = ismember(reach_trials,trials_vec);
+reach_times_inVec = reach_times(reach_inVec_idx);
+n_reach_inVec = length(reach_times_inVec);
+reach_trials_inVec = reach_trials(reach_inVec_idx);
+cat_reach_inVec = cat_reach(reach_inVec_idx);
+hit_inVec = is_hit(reach_inVec_idx);
+reaches_inVec_px = reaches.reach_mat(:,:,reach_inVec_idx);
+
+p2m = [session.video.calib.px2mm.px2mm_xz, session.video.calib.px2mm.px2mm_y, ...
+    session.video.calib.px2mm.px2mm_xz];
+reaches_inVec_mm = cat(2,reaches_inVec_px(:,1,:).*p2m(1),...
+    reaches_inVec_px(:,2,:).*p2m(2),...
+    reaches_inVec_px(:,3,:).*p2m(3)); 
+
+
+% Figure properties
+% Figure
+axeOpt = {'linewidth',1.5,'box','off','GridAlpha',...
+    0.05,'ticklength',[1,1]*.01,'fontsize',10, 'TickDir', 'out'};
+% Colors
+clr_left = behavior.colors.left_color;
+clr_right = behavior.colors.right_color;
+clr_center = behavior.colors.center_color;
+
+figProp.axeOpt = axeOpt;
+figProp.clr_left = clr_left;
+figProp.clr_right = clr_right;
+figProp.clr_center = clr_center;
+
+%% SAVE
+% Save full trials
+bhv.all_trials.push_idx_all = push_idx_all;
+bhv.all_trials.pull_idx_all = pull_idx_all;
+bhv.all_trials.left_idx_all = left_idx_all;
+bhv.all_trials.right_idx_all = right_idx_all;
+bhv.all_trials.center_idx_all = center_idx_all;
+bhv.all_trials.initiation_times_all = initiation_times_all;
+bhv.all_trials.inva_push_times_all = inva_push_times_all;
+bhv.all_trials.reach_times = reach_times;
+bhv.all_trials.reach_trials = reach_trials;
+bhv.all_trials.is_success = is_success;
+bhv.all_trials.is_hit = is_hit;
+bhv.all_trials.is_purpose = is_purpose;
+bhv.all_trials.cat_reach = cat_reach;
+
+% Selected window
+bhv.win_selected.trials_vec = trials_vec;
+bhv.win_selected.select_start_time = select_start_time;
+bhv.win_selected.time_sess_end = time_sess_end;
+
+% Variables of interest
+bhv.push_idx = push_idx;
+bhv.pull_idx = pull_idx;
+bhv.left_idx = left_idx;
+bhv.center_idx = center_idx;
+bhv.right_idx = right_idx;
+bhv.dom_idx = dom_idx;
+bhv.nondom_idx = nondom_idx;
+bhv.pp_times = pp_times;
+bhv.init_invPush_invPull_idx = init_invPush_invPull_idx;
+bhv.valPushPull_invalPushPull_idx = valPushPull_invalPushPull_idx;
+bhv.reach_inVec_idx = reach_inVec_idx;
+bhv.reach_times_inVec = reach_times_inVec;
+bhv.reach_trials_inVec = reach_trials_inVec;
+bhv.cat_reach_inVec = cat_reach_inVec;
+bhv.hit_inVec = hit_inVec;
+bhv.reaches_inVec_px = reaches_inVec_px;
+bhv.reaches_inVec_mm = reaches_inVec_mm;
+
+bhv.figProp = figProp;
+bhv.mouse = mouse;
+bhv.session = session;
+bhv.paw_pref = mouse_info.paw_pref;
+
+save(fullfile(save_mat,'behavior_fundamentals.mat'),'bhv');
+disp('bhv struct saved!')
+
+
+
+%% Find resting bar reaches to left, center and right
+
+left_cat1_idx = find(ismember(reach_trials_inVec,left_idx) & cat_reach_inVec==1);
+center_cat1_idx = find(ismember(reach_trials_inVec,center_idx) & cat_reach_inVec==1);
+right_cat1_idx = find(ismember(reach_trials_inVec,right_idx) & cat_reach_inVec==1);
+
+% Smooth individual reaches
+tm_r = reaches.tm_w;
+fps_vid = session.video.frame_rate;
+paw_bin_width = 1/fps_vid;
+sig_pk = 0.002;
+k_gaus_paw = gausskernel('sig',sig_pk,'binwidth',paw_bin_width);
+
+sm_tm = tm_r(1)-k_gaus_paw.paddx(1):paw_bin_width:tm_r(end)-k_gaus_paw.paddx(2)+paw_bin_width;
+nr_sm_frames = length(sm_tm);
+
+sm_reaches = nan(nr_sm_frames,3,size(reaches_inVec_mm,3));
+for i = 1:3
+    sm_reaches(:,i,:) = conv2(k_gaus_paw.pdf,1,squeeze(reaches_inVec_mm(:,i,:)),"valid");
+end
+
+flag_smooth = 0;
+if flag_smooth==1
+    reach_choice = sm_reaches;
+    time_range = sm_tm;
+else
+    reach_choice = reaches_inVec_mm;
+    time_range = tm_r;
+end
+
+% Left / Center / Right
+left1_r = squeeze(reach_choice(:,:,left_cat1_idx));
+center1_r = squeeze(reach_choice(:,:,center_cat1_idx));
+right1_r = squeeze(reach_choice(:,:,right_cat1_idx));
+
+left1_med = median(reach_choice(:,:,left_cat1_idx),3,"omitnan");
+center1_med = median(reach_choice(:,:,center_cat1_idx),3,"omitnan");
+right1_med = median(reach_choice(:,:,right_cat1_idx),3,"omitnan");
+
+left1_mean = mean(reach_choice(:,:,left_cat1_idx),3,"omitnan");
+center1_mean = mean(reach_choice(:,:,center_cat1_idx),3,"omitnan");
+right1_mean = mean(reach_choice(:,:,right_cat1_idx),3,"omitnan");
+
+%% Plot
+transpa = .03;
+lw = 2.5;
+lw_med = 2.5;
+figure()
+fig = tiledlayout(3,2);
+
+tilee = [1, 3, 5];
+dims = ['x (mm)';'y (mm)';'z (mm)'];
+
+for i = 1:3
+    nexttile(tilee(i))
+    plot(time_range,squeeze(left1_r(:,i,:)),'Color',cat(2,clr_left,transpa),'LineWidth',lw); hold on
+    plot(time_range,squeeze(center1_r(:,i,:)),'Color',cat(2,clr_center,transpa),'LineWidth',lw); hold on
+    plot(time_range,squeeze(right1_r(:,i,:)),'Color',cat(2,clr_right,transpa),'LineWidth',lw); hold on
+
+    plot(time_range,left1_med(:,i),'Color',cat(2,clr_left),'LineWidth',lw_med);
+    plot(time_range,center1_med(:,i),'Color',cat(2,clr_center),'LineWidth',lw_med);
+    plot(time_range,right1_med(:,i),'Color',cat(2,clr_right),'LineWidth',lw_med);
+
+    xlabel('time (s)'); ylabel(dims(i,:));
+    set(gca,axeOpt{:});
+%    xlim([tm_r(1) tm_r(end)])
+axis tight
+end
+
+nexttile(2,[3,1])
+lw_mean_3 = 3;
+transp = 0.01;
+transp_mean_proj = 1;
+mean_p_lw = 2;
+trial_lw = 2;
+origin = [0, 0, 0];
+axis_xyz = [5 35 0 32 0 25];
+sz = 50;
+max_reach = reaches.reach_params.reach_interval.max_reach;
+
+% 3d
+l = plot3(left1_mean(:,1),left1_mean(:,2),left1_mean(:,3),'LineWidth',lw_mean_3,'Color',clr_left); hold on
+c = plot3(center1_mean(:,1),center1_mean(:,2),center1_mean(:,3),'LineWidth',lw_mean_3,'Color',clr_center); hold on
+r = plot3(right1_mean(:,1),right1_mean(:,2),right1_mean(:,3),'LineWidth',lw_mean_3,'Color',clr_right); hold on
+scatter3(left1_mean(max_reach,1),left1_mean(max_reach,2),left1_mean(max_reach,3),sz,'filled','MarkerFaceColor',clr_left); hold on
+scatter3(center1_mean(max_reach,1),center1_mean(max_reach,2),center1_mean(max_reach,3),sz,'filled','MarkerFaceColor',clr_center); hold on
+scatter3(right1_mean(max_reach,1),right1_mean(max_reach,2),right1_mean(max_reach,3),sz,'filled','MarkerFaceColor',clr_right); hold on
+axis(axis_xyz)
+
+% projections
+oneMat = ones(size(reach_choice,1),1);
+yL = get(gca,'YLim');
+zL = get(gca,'ZLim');
+% plot3(squeeze(left1_r(:,1,:)), oneMat .* yL(2), squeeze(left1_r(:,3,:)),'-','Color',cat(2,clr_left,transp),'LineWidth',trial_lw);
+% plot3(squeeze(left1_r(:,1,:)), squeeze(left1_r(:,2,:)), oneMat .* zL(1),'-','Color',cat(2,clr_left,transp),'LineWidth',trial_lw);
+% plot3(squeeze(center1_r(:,1,:)), oneMat .* yL(2), squeeze(center1_r(:,3,:)),'-','Color',cat(2,clr_center,transp),'LineWidth',trial_lw);
+% plot3(squeeze(center1_r(:,1,:)), squeeze(center1_r(:,2,:)), oneMat .* zL(1),'-','Color',cat(2,clr_center,transp),'LineWidth',trial_lw);
+% plot3(squeeze(right1_r(:,1,:)), oneMat .* yL(2), squeeze(right1_r(:,3,:)),'-','Color',cat(2,clr_right,transp),'LineWidth',trial_lw);
+% plot3(squeeze(right1_r(:,1,:)), squeeze(right1_r(:,2,:)), oneMat .* zL(1),'-','Color',cat(2,clr_right,transp),'LineWidth',trial_lw);
+
+% projections mean
+plot3(left1_mean(:,1), oneMat .* yL(2), left1_mean(:,3),'-','Color',cat(2,clr_left,transp_mean_proj),'LineWidth',mean_p_lw);
+plot3(left1_mean(:,1), left1_mean(:,2), oneMat .* zL(1),'-','Color',cat(2,clr_left,transp_mean_proj),'LineWidth',mean_p_lw);
+plot3(center1_mean(:,1), oneMat .* yL(2), center1_mean(:,3),'-','Color',cat(2,clr_center,transp_mean_proj),'LineWidth',mean_p_lw);
+plot3(center1_mean(:,1), center1_mean(:,2), oneMat .* zL(1),'-','Color',cat(2,clr_center,transp_mean_proj),'LineWidth',mean_p_lw);
+plot3(right1_mean(:,1), oneMat .* yL(2), right1_mean(:,3),'-','Color',cat(2,clr_right,transp_mean_proj),'LineWidth',mean_p_lw);
+plot3(right1_mean(:,1), right1_mean(:,2), oneMat .* zL(1),'-','Color',cat(2,clr_right,transp_mean_proj),'LineWidth',mean_p_lw);
+hold off
+
+view(-58,20)
+grid on
+set(gca,axeOpt{:},'GridAlpha',0.01);
+xlabel('x (mm)'); ylabel('y (mm)'); zlabel('z (mm)');
+yL = get(gca,'YLim');
+zL = get(gca,'ZLim');
+legend([l,c,r],'left reaches','center reaches','right reaches','box','off','Location','northwestoutside')
+
+set(gcf,'Position',[2012 397 1265 598],'Color','w')
+
+
+saveas(gcf,strcat(save_out,filesep,'reaches1_left_center_right.png'),'png');
+%print(gcf, fullfile(save_out, 'reaches1_left_center_right.pdf'), '-dpdf', '-painters');
+%exportgraphics(gcf, fullfile(save_out, 'reaches1_left_center_right.pdf'), 'ContentType', 'auto');
+
+
+
+
+
+
+
+
+
+

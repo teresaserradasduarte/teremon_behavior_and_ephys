@@ -1,4 +1,6 @@
-%% SESSION ANALYSIS - Detecting reaches
+%% REACHING SESSION ANALYSIS 1
+% Step 1: Detecting reaches, classify, categorize
+% Save behavior struct with all information
 clear; close all; clc
     
 %% FOLDER ORGANIZATION
@@ -14,9 +16,9 @@ animals = {...
     'Toblerone',...
     'Milka',...
     'FerreroRocher'};
-animal_idx = 3;
+animal_idx = 1;
 mouse = sprintf('%i_%s',animal_idx,animals{animal_idx});
-session_range = 'R3';
+session_range = 'R7';
 
 % Mouse paw preference
 % R -> righties | L-> Lefties
@@ -121,6 +123,19 @@ if  exist(strcat(char(folders.mat),filesep,'session_raw_data_paw',paw_pref,'.mat
     [max_siz, max_siz_loc]=max(siz(start_trials:end)); 
     disp(strcat('Done: max= ',num2str(max_siz)))
 
+    % Remove empty videos
+    siz_tmp = siz;
+    vec_actualTrials = logical(siz);
+    empty_trials = find(siz==1);
+    vec_actualTrials(empty_trials)=0;
+    vec_actualTrials(empty_trials+1)=0;
+    trials_vec_original = start_trials:n_trials;
+    trials_w_vid = trials_vec_original(vec_actualTrials(start_trials:n_trials));
+
+    % Resize
+    n_trials = length(trials_w_vid);
+    siz=siz(trials_w_vid);
+
     % Allocate space
     n_max_points = max_siz;
     bodyparts_nr = 12;
@@ -137,24 +152,28 @@ if  exist(strcat(char(folders.mat),filesep,'session_raw_data_paw',paw_pref,'.mat
     camA_in_row = [];
     camB_in_row = [];
     camC_in_row = [];
-    for i=start_trials:n_trials % to ensure cronologinal ordering
+
+    %for i=start_trials:n_trials % to ensure cronologinal ordering
+    idx=1;
+    for i=trials_w_vid % to ensure cronologinal ordering
         % cam A
         tmp_camA_csv = strcat(folders.raw, filesep,sess,'-camA-trial',num2str(i),resnet,'.csv');
         tmp_camA=csvread(tmp_camA_csv,3,1);
-        camA(1:size(tmp_camA,1),:,i) = tmp_camA;
-        time(1:size(tmp_camA,1),i) = (1:size(tmp_camA,1))./frame_rate;
+        camA(1:size(tmp_camA,1),:,idx) = tmp_camA;
+        time(1:size(tmp_camA,1),idx) = (1:size(tmp_camA,1))./frame_rate;
         camA_in_row=cat(1,camA_in_row,tmp_camA);
         % cam B
         tmp_camB_csv = strcat(folders.raw, filesep,sess,'-camB-trial',num2str(i),resnet,'.csv');
         tmp_camB=csvread(tmp_camB_csv,3,1);
-        camB(1:size(tmp_camB,1),:,i) = tmp_camB;
+        camB(1:size(tmp_camB,1),:,idx) = tmp_camB;
         camB_in_row=cat(1,camB_in_row,tmp_camB);
         % cam C
         tmp_camC_csv = strcat(folders.raw, filesep,sess,'-camC-trial',num2str(i),resnet,'.csv');
         tmp_camC=csvread(tmp_camC_csv,3,1);
-        camC(1:size(tmp_camC,1),:,i) = tmp_camC;
+        camC(1:size(tmp_camC,1),:,idx) = tmp_camC;
         camC_in_row=cat(1,camC_in_row,tmp_camC);
-        disp(strcat('trial',num2str(i)))
+        disp(strcat('video trial ',num2str(i),' - real trial ',num2str(idx)))
+        idx = idx+1;
     end
     disp('Done!')
     toc
@@ -278,6 +297,7 @@ if  exist(strcat(char(folders.mat),filesep,'session_raw_data_paw',paw_pref,'.mat
         'pawR','pawL','water','pawR_mm','pawL_mm','water_mm','time',...
         'pawR_order','pawL_order','water_order',...
         'dom_paw_mm','dom_paw','nondom_paw_mm','nondom_paw','nondom_paw_in_row','dom_paw_in_row',...
+        'trials_vec_original','trials_w_vid','siz_tmp',...
         '-v7.3');
 
     % Show plots
@@ -324,6 +344,7 @@ if  exist(strcat(char(folders.mat),filesep,'session_raw_data_paw',paw_pref,'.mat
         if save_fig_flag, saveas(gcf, strcat(folders.out_preProc,filesep,'raw_pawL_trial',num2str(tt),'.png'),'png'); end
 
         figure%(3)
+
         subplot(311)
         plot(water_A(:,1,tt)); hold on
         plot(water_C(:,1,tt));
@@ -331,6 +352,7 @@ if  exist(strcat(char(folders.mat),filesep,'session_raw_data_paw',paw_pref,'.mat
         legend('camA','camC','camSelec');
         xlabel('time (frames)'), ylabel('x');
         title('water')
+
         subplot(312)
         plot(water(:,2,tt),'k');
         legend('camB')
@@ -694,7 +716,7 @@ end
 % TRIAL LOOP
 disp('Finding reaches...')
 
-%tt=30
+%tt=10
 for tt = start_trials:n_trials
     disp(strcat('trial ',num2str(tt)))
 
@@ -742,7 +764,7 @@ for tt = start_trials:n_trials
         if timestamp_iti_start(tt) > frames_timestamps_tmp(1) && timestamp_iti_start(tt) < frames_timestamps_tmp(end)
             [~,iti_start_frame(tt)] = min(abs(frames_timestamps_tmp - timestamp_iti_start(tt)));
         end
-        timestamp_iti_end(tt) = behavior.inputs.read_log(behavior.logs.trial_available_all_ind(real_tt+1),1);
+        timestamp_iti_end(tt) = behavior.inputs.read_log(behavior.logs.ITIs_start_ind(real_tt)+1,1);
         if timestamp_iti_end(tt) > frames_timestamps_tmp(1) && timestamp_iti_end(tt) < frames_timestamps_tmp(end)
             [~,iti_end_frame(tt)] = min(abs(frames_timestamps_tmp - timestamp_iti_end(tt)));
         end
@@ -886,7 +908,7 @@ for tt = start_trials:n_trials
         disp(strcat('no reaches in trial',num2str(tt)))
     else
         for r_ind = 1:nreaches_trial
-            %r_ind=1
+            %r_ind=4
             % reach max rame
             rr=xmax_frame(r_ind);
             nn_max_points_tt = siz(tt);
@@ -1141,12 +1163,12 @@ for tt = start_trials:n_trials
             if strcmp(paw_pref,'R')
                 threshold_resting = 180;
                 threshold_drink = 240;
-                min_length_drink = 60;
+                min_length_drink = 45;
                 max_z_lim = 200;
             elseif strcmp(paw_pref,'L')
                 threshold_resting = 180;
                 threshold_drink = 240;  
-                min_length_drink = 45;
+                min_length_drink = 30;
                 max_z_lim = 250;
             end
 
@@ -1777,6 +1799,7 @@ reaches.reach_params.cat_and_class.lags_lim_z = lags_lim_z;
 reaches.reach_params.cat_and_class.other_lag = other_lag;
 reaches.reach_params.cat_and_class.threshold_resting = threshold_resting;
 reaches.reach_params.cat_and_class.threshold_drink = threshold_drink;
+reaches.reach_params.cat_and_class.min_length_drink = min_length_drink;
 reaches.reach_params.cat_and_class.max_z_lim = max_z_lim;
 reaches.reach_params.cat_and_class.succ.pp = pp;
 reaches.reach_params.cat_and_class.succ.magnitude_largerThanBound = magnitude_largerThanBound;

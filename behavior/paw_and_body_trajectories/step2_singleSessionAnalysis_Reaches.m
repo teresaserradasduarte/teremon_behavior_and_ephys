@@ -1,4 +1,5 @@
-%% Session Analysis STEP2
+%% REACHING SESSION ANALYSIS 2
+% Step 2: Normalize reach position and convert to mm
 % After extracting an categorizing reaches, display the data
 % v3 -> v4 : add/replace origin from water to centre of resting bar
 clear; close all; clc
@@ -8,10 +9,6 @@ raw_folder = 'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\
 mat_folder = 'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\behavior_data\analyzed_data\mat_files';
 out_folder = 'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\behavior_data\analyzed_data\output_files';
 
-% group = '20201006_AtaxicMice_G2';
-% setup = 'headfixed_setup1';
-% mouse = 'B1_MRC-06855';
-
 group = '20230511_ChocolateGroup';
 setup = 'headfixed_dynamicTarget';
 animals = {...
@@ -20,9 +17,9 @@ animals = {...
     'Toblerone',...
     'Milka',...
     'FerreroRocher'};
-animal_idx = 3;
+animal_idx = 1;
 mouse = sprintf('%i_%s',animal_idx,animals{animal_idx});
-sess = 'R3';
+sess = 'R7';
 save_flag = true;
 
 % Normalize reaches position
