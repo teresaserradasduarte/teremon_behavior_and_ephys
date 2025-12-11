@@ -41,4 +41,4 @@ function plot_reach_raster_and_psth(eg_neurons,i,bin_edges,win_interest,figProp,
     yticks(yticks_to_label);
     yticklabels(string(ytick_labels));
     ylabel(figProp.y_name)
-    shg
+    

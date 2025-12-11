@@ -13,11 +13,11 @@ animals = {...
     'Toblerone',...
     'Milka',...
     'FerreroRocher'};
-animal_idx = 3;
+animal_idx = 4;
 mouse = sprintf('%i_%s',animal_idx,animals{animal_idx});
 
 %% Session & ephys source
-sess = 'R6';
+sess = 'R4';
 imec_id = 1;
 ephys_sess = '28082023_Toblerone_StrCer_S6_g0';
 sorter_folder = 'catGT\kilosort4';

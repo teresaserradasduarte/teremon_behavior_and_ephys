@@ -14,9 +14,10 @@ animals = {...
     'Toblerone',...
     'Milka',...
     'FerreroRocher'};
-animal_idx = 5;
+animal_idx = 1;
 mouse = sprintf('%i_%s',animal_idx,animals{animal_idx});
-sess = 'R6';
+sess = 'R7';
+
 
 %% paths
 rootdir = 'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD';
@@ -110,7 +111,6 @@ n_reach_inVec = length(reach_times_inVec);
 reach_trials_inVec = reach_trials(reach_inVec_idx);
 cat_reach_inVec = cat_reach(reach_inVec_idx);
 hit_inVec = is_hit(reach_inVec_idx);
-suc_inVec = is_success(reach_inVec_idx);
 reaches_inVec_px = reaches.reach_mat(:,:,reach_inVec_idx);
 
 p2m = [session.video.calib.px2mm.px2mm_xz, session.video.calib.px2mm.px2mm_y, ...
@@ -118,6 +118,41 @@ p2m = [session.video.calib.px2mm.px2mm_xz, session.video.calib.px2mm.px2mm_y, ..
 reaches_inVec_mm = cat(2,reaches_inVec_px(:,1,:).*p2m(1),...
     reaches_inVec_px(:,2,:).*p2m(2),...
     reaches_inVec_px(:,3,:).*p2m(3)); 
+
+
+                bhv.suc_inVec = reaches.success_reach(reach_inVec_idx);
+
+                bhv.left_inVec = ismember(bhv.reach_trials_inVec,bhv.left_idx);
+                bhv.center_inVec =  ismember(bhv.reach_trials_inVec,bhv.center_idx);
+                bhv.right_inVec = ismember(bhv.reach_trials_inVec,bhv.right_idx);
+
+                bhv.push_inVec = ismember(bhv.reach_trials_inVec,bhv.push_idx);
+                bhv.pull_inVec = ismember(bhv.reach_trials_inVec,bhv.pull_idx);
+
+                bhv.pp_inVec_idx = zeros(size(bhv.reach_trials_inVec));
+                bhv.pp_inVec_idx(bhv.push_inVec==1) = 0;
+                bhv.pp_inVec_idx(bhv.pull_inVec==1) = 1;
+
+                bhv.LCR_inVec_idx = zeros(size(bhv.reach_trials_inVec));
+                bhv.LCR_inVec_idx(bhv.center_inVec==1) = 2;
+                bhv.LCR_inVec_idx(bhv.left_inVec==1) = 1;
+                bhv.LCR_inVec_idx(bhv.right_inVec==1) = 3;
+
+                bhv.DCnD_init = zeros(length(bhv.init_invPush_invPull_idx),1);
+                bhv.DCnD_init(bhv.center_idx) = 2;
+                bhv.DCnD_inVec_idx = zeros(size(bhv.reach_trials_inVec));
+                bhv.DCnD_inVec_idx(bhv.center_inVec) = 2;
+                if strcmp(bhv.paw_pref,'R')
+                    bhv.DCnD_inVec_idx(bhv.right_inVec) = 1;
+                    bhv.DCnD_inVec_idx(bhv.left_inVec) = 3;
+                    bhv.DCnD_init(bhv.right_idx) = 1;
+                    bhv.DCnD_init(bhv.left_idx) = 3;
+                elseif strcmp(bhv.paw_pref,'L')
+                    bhv.DCnD_inVec_idx(bhv.left_inVec) = 1;
+                    bhv.DCnD_inVec_idx(bhv.right_inVec) = 3;
+                    bhv.DCnD_init(bhv.left_idx) = 1;
+                    bhv.DCnD_init(bhv.right_idx) = 3;
+                end
 
 
 % Figure properties
@@ -175,8 +210,6 @@ bhv.reach_times_inVec = reach_times_inVec;
 bhv.reach_trials_inVec = reach_trials_inVec;
 bhv.cat_reach_inVec = cat_reach_inVec;
 bhv.hit_inVec = hit_inVec;
-bhv.suc_inVec = suc_inVec;
-
 bhv.reaches_inVec_px = reaches_inVec_px;
 bhv.reaches_inVec_mm = reaches_inVec_mm;
 
@@ -184,40 +217,6 @@ bhv.figProp = figProp;
 bhv.mouse = mouse;
 bhv.session = session.session;
 bhv.paw_pref = mouse_info.paw_pref;
-
-% Added later
-bhv.left_inVec = ismember(bhv.reach_trials_inVec,bhv.left_idx);
-bhv.center_inVec =  ismember(bhv.reach_trials_inVec,bhv.center_idx);
-bhv.right_inVec = ismember(bhv.reach_trials_inVec,bhv.right_idx);
-
-bhv.push_inVec = ismember(bhv.reach_trials_inVec,bhv.push_idx);
-bhv.pull_inVec = ismember(bhv.reach_trials_inVec,bhv.pull_idx);
-
-bhv.pp_inVec_idx = zeros(size(bhv.reach_trials_inVec));
-bhv.pp_inVec_idx(bhv.push_inVec==1) = 0;
-bhv.pp_inVec_idx(bhv.pull_inVec==1) = 1;
-
-bhv.LCR_inVec_idx = zeros(size(bhv.reach_trials_inVec));
-bhv.LCR_inVec_idx(bhv.center_inVec==1) = 2;
-bhv.LCR_inVec_idx(bhv.left_inVec==1) = 1;
-bhv.LCR_inVec_idx(bhv.right_inVec==1) = 3;
-
-bhv.DCnD_init = zeros(length(bhv.init_invPush_invPull_idx),1);
-bhv.DCnD_init(bhv.center_idx) = 2;
-bhv.DCnD_inVec_idx = zeros(size(bhv.reach_trials_inVec));
-bhv.DCnD_inVec_idx(bhv.center_inVec) = 2;
-if strcmp(bhv.paw_pref,'R')
-    bhv.DCnD_inVec_idx(bhv.right_inVec) = 1;
-    bhv.DCnD_inVec_idx(bhv.left_inVec) = 3;
-    bhv.DCnD_init(bhv.right_idx) = 1;
-    bhv.DCnD_init(bhv.left_idx) = 3;
-elseif strcmp(bhv.paw_pref,'L')
-    bhv.DCnD_inVec_idx(bhv.left_inVec) = 1;
-    bhv.DCnD_inVec_idx(bhv.right_inVec) = 3;
-    bhv.DCnD_init(bhv.left_idx) = 1;
-    bhv.DCnD_init(bhv.right_idx) = 3;
-end
-
 
 save(fullfile(save_mat,'behavior_fundamentals.mat'),'bhv');
 disp('bhv struct saved!')

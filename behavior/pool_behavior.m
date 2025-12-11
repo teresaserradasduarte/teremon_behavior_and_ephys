@@ -23,7 +23,7 @@ num_animals=size(folders_mice,1);
 mice = cell(num_animals,1);
 mice_path = cell(num_animals,1);
 
-% Allocate pace for variables
+% Allocate space for variables
 sess = ['R1';'R2';'R3';'R4';'R5';'R6';'R7'];
 n_sess = size(sess,1);
 

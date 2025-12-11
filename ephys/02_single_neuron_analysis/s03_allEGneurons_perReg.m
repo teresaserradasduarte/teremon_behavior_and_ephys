@@ -1,0 +1,199 @@
+%% NEURONS STEP 2
+% GET EG neurons, calculate instantaneous FR
+% align to push/pull and reach from DLC
+% neuron type?? sort to visualize?
+clear; close all; clc
+
+%% %% Load data
+% Group and individual
+rootdir = 'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\';
+group = '20230801_ChocolateGroup';
+animals = {...
+    'CoteDor',...
+    'Lindt',...
+    'Toblerone',...
+    'Milka',...
+    'FerreroRocher'};
+n_mice = length(animals);
+n_sess = 7;
+
+%% run though mice and sess
+
+n_good_neu = nan(n_mice,n_sess,2);
+n_mua_neu = nan(n_mice,n_sess,2);
+n_eg_neu = nan(n_mice,n_sess,2);
+
+all_CT_neurons = [];
+all_BG_neurons = [];
+all_BS_neurons = [];
+all_CB_neurons = [];
+
+for m=1:length(animals)
+    %m=1;
+    animal_idx = m;
+    mouse = sprintf('%i_%s',animal_idx,animals{animal_idx});
+    fprintf('%s%s%s\n','Running ',mouse,'...')
+
+    mouse_path = fullfile(rootdir,"ephys_and_behavior","mat_files",group,mouse);
+    reg_sep = readtable(sprintf('%s%s%s%s%s',mouse_path,filesep,'regions separation - ',mouse,'.csv'));
+
+    for s=1:n_sess
+        %s=1;
+        sess = sprintf('%s%i','R',s);
+        sess_path = fullfile(mouse_path,sess);
+
+        % Run through sessions
+        if exist(sess_path,'dir')~=0
+            fprintf('%s%s:\n','Running session ',sess)
+            load(fullfile(sess_path,'behavior_fundamentals.mat'))
+
+            % BASAL GANGLIA
+            if exist(fullfile(sess_path,'eg_neurons_BG.mat'), 'file')~=0
+                fprintf('%s\n','BG probe')
+                load(fullfile(sess_path,'eg_neurons_BG.mat'))
+
+                n_good_neu(m,s,1) = eg_neurons(1).meta.n_good;
+                n_mua_neu(m,s,1) = eg_neurons(1).meta.n_mua;
+                n_eg_neu(m,s,1) = length(eg_neurons);
+
+                for i=1:length(eg_neurons)
+                    if (eg_neurons(i).depth <= reg_sep(s,2).belowStriatum)
+                        eg_neurons(i).reg = 'BG';
+                    else
+                        eg_neurons(i).reg = 'CT';
+                    end
+                end
+
+                % Create table for each region
+                neu_eg = struct2table(eg_neurons);
+                neu = removevars(neu_eg, {'st','st_reachIdx','st_reachIdx','st_init','st_initIdx','unitIdx','egIdx','CCG_bins','CCG','templateID','templateWeight','templatePeakCh','templateWaveforms','meta'});
+                % Add behavioral variables
+                neu.idx_init_vPP_invPP = repmat(bhv.valPushPull_invalPushPull_idx,[1 size(neu,1)])';
+                neu.DCnD_init = repmat(bhv.DCnD_init,[1 size(neu,1)])';
+                neu.idx_reach_cat = repmat(bhv.cat_reach_inVec,[1 size(neu,1)])';
+                neu.idx_reach_hit = repmat(bhv.hit_inVec,[1 size(neu,1)])';
+                neu.idx_reach_succ = repmat(bhv.suc_inVec,[1 size(neu,1)])';
+                neu.idx_reach_hDCnD =  repmat(bhv.DCnD_inVec_idx,[1 size(neu,1)])';
+                neu.idx_reach_LCR =  repmat(bhv.LCR_inVec_idx,[1 size(neu,1)])';
+                neu.idx_reach_PP =  repmat(bhv.pp_inVec_idx,[1 size(neu,1)])';
+                neu.reach_px = repmat({bhv.reaches_inVec_px},size(neu,1),1);
+                neu.mouse = repmat(mouse,[size(neu,1),1]);
+                neu.sess = repmat(sess,[size(neu,1),1]);
+
+                % Neu struct for each region, less info but with bhv
+                BG_idx = neu.reg == "BG";
+                neu_BG = neu(BG_idx,:);
+                neu_CT = neu(~BG_idx,:);
+                neurons_BG = table2struct(neu_BG);
+                neurons_CT = table2struct(neu_CT);
+                %save(fullfile(sess_path,'neurons_BG.mat'),'neurons_BG');
+                %save(fullfile(sess_path,'neurons_CT.mat'),'neurons_CT');
+
+                % Mat with all neurons together
+                all_CT_neurons = [all_CT_neurons;neurons_CT];
+                all_BG_neurons = [all_BG_neurons;neurons_BG];
+
+                % clear
+                clear eg_neurons neu_eg neu
+            end
+
+            % CEREBELLUM
+            if exist(fullfile(sess_path,'eg_neurons_CB.mat'), 'file')~=0
+                fprintf('%s\n','CB probe')
+                load(fullfile(sess_path,'eg_neurons_CB.mat'))
+
+                n_good_neu(m,s,2) = eg_neurons(1).meta.n_good;
+                n_mua_neu(m,s,2) = eg_neurons(1).meta.n_mua;
+                n_eg_neu(m,s,2) = length(eg_neurons);
+
+                for i=1:length(eg_neurons)
+                    if (eg_neurons(i).depth <= reg_sep(s,3).belowBrainstem)
+                        eg_neurons(i).reg = 'BS';
+                    elseif (eg_neurons(i).depth <= reg_sep(s,4).belowDCN)
+                        eg_neurons(i).reg = 'CB_DCN';
+                    else
+                        eg_neurons(i).reg = 'CB_CTX';
+                    end
+                end
+
+                % Create table for each region
+                neu_eg = struct2table(eg_neurons);
+                neu = removevars(neu_eg, {'st','st_reachIdx','st_reachIdx','st_init','st_initIdx','unitIdx','egIdx','CCG_bins','CCG','templateID','templateWeight','templatePeakCh','templateWaveforms','meta'});
+                % Add behavioral variables
+                neu.idx_init_vPP_invPP = repmat(bhv.valPushPull_invalPushPull_idx,[1 size(neu,1)])';
+                neu.DCnD_init = repmat(bhv.DCnD_init,[1 size(neu,1)])';
+                neu.idx_reach_cat = repmat(bhv.cat_reach_inVec,[1 size(neu,1)])';
+                neu.idx_reach_hit = repmat(bhv.hit_inVec,[1 size(neu,1)])';
+                neu.idx_reach_succ = repmat(bhv.suc_inVec,[1 size(neu,1)])';
+                neu.idx_reach_hDCnD =  repmat(bhv.DCnD_inVec_idx,[1 size(neu,1)])';
+                neu.idx_reach_LCR =  repmat(bhv.LCR_inVec_idx,[1 size(neu,1)])';
+                neu.idx_reach_PP =  repmat(bhv.pp_inVec_idx,[1 size(neu,1)])';
+                neu.reach_px = repmat({bhv.reaches_inVec_px},size(neu,1),1);
+                neu.mouse = repmat(mouse,[size(neu,1),1]);
+                neu.sess = repmat(sess,[size(neu,1),1]);
+
+                % Neu struct for each region, less info but with bhv
+                BS_idx = neu.reg == "BS";
+                neu_BS = neu(BS_idx,:);
+                neu_CB = neu(~BS_idx,:);
+                neurons_BS = table2struct(neu_BS);
+                neurons_CB = table2struct(neu_CB);
+                %save(fullfile(sess_path,'neurons_BS.mat'),'neurons_BS');
+                %save(fullfile(sess_path,'neurons_CB.mat'),'neurons_CB');
+
+                % Mat with all neurons together
+                all_CB_neurons = [all_CB_neurons;neurons_CB];
+                all_BS_neurons = [all_BS_neurons;neurons_BS];
+
+                % clear
+                clear eg_neurons neu_eg neu
+            end
+
+            clear bhv
+        end
+    end % end session
+end % end mouse
+
+
+
+%% Save
+fprintf('%s','Saving struct with all extra-good neurons...')
+save_path = fullfile(rootdir,"ephys_and_behavior","mat_files",group);
+save(fullfile(save_path,'eg_neurons'),...
+    'all_CT_neurons','all_BG_neurons',...
+    'all_CB_neurons','all_BS_neurons',...
+    'n_eg_neu','n_good_neu','n_mua_neu','-v7.3')
+fprintf('%s','All done!!')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

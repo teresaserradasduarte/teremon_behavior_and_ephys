@@ -12,12 +12,14 @@ animals = {...
     'Toblerone',...
     'Milka',...
     'FerreroRocher'};
-
-all_sess = {['R1';'R6'],...
-    ['R1';'R2';'R4'],...
-    ['R3';'R6'],...
-    ['R4'],...
-    ['R1';'R4';'R6']};
+% 
+% all_sess = {['R1';'R6'],...
+%     ['R1';'R2';'R4'],...
+%     ['R3';'R6'],...
+%     ['R4'],...
+%     ['R1';'R4';'R6']};
+sess_all = ['R1';'R2';'R3';'R4';'R5';'R6';'R7'];
+n_sess = size(sess,1);
 
 % Initialize
 load(fullfile(rootdir,"behavior_data/","analyzed_data/mat_files/","20230511_ChocolateGroup/","headfixed_dynamicTarget/","1_CoteDor/","R6/","behavior_session.mat"))
@@ -25,7 +27,7 @@ load(fullfile(rootdir,"behavior_data/","analyzed_data/mat_files/","20230511_Choc
 
 %% Create path to save
 %save_mat = fullfile(rootdir,"behavior_data","analyzed_data","mat_files",group_behav,setup,'group');
-save_out = fullfile(rootdir,"behavior_data","analyzed_data","output_files",group_behav,setup,'behav_group','reach_location');
+save_out = fullfile(rootdir,"behavior_data","analyzed_data","output_files",group_behav,setup,'behav_group','reach_location2');
 if ~exist(save_out,"dir"), mkdir(save_out); end
 %if ~exist(save_mat,"dir"), mkdir(save_mat); end
 
@@ -35,7 +37,6 @@ mat_dir_b = fullfile(rootdir,"ephys_and_behavior","mat_files",group);
 %% Initialize variables 
 n_max = 500;
 n_mice = length(animals);
-n_sess = 3;
 reaches1_px_loc = nan(201,3,500,3,n_sess,n_mice);
 n_reaches_loc = nan(3,n_sess,n_mice);
 n_reaches_loc_LCR = nan(3,n_sess,n_mice);
@@ -44,19 +45,23 @@ n_suc_loc = nan(3,n_sess,n_mice);
 n_hit_loc = nan(3,n_sess,n_mice);
 duration_f_loc = nan(n_max,3,n_sess,n_mice);
 
-%% SVM - Lood through mice and session
+%%  Loop through mice and session
 for m=1:length(animals)
     animal_idx = m;
     mouse = sprintf('%i_%s',animal_idx,animals{animal_idx});
-    fprintf('%s%s%s\n','Looping through ',mouse,':') 
+    fprintf('%s%s%s\n','Looping through ',mouse,':')
 
-    for s=1:size(all_sess{m},1)
-        sess = all_sess{m}(s,:);
-        fprintf('%s%s%s%s%s\n','Running mouse ',mouse,', session ',sess,':')
+    for s=1:n_sess
+        sess = sess_all(s,:);
+        if exist(fullfile(mat_dir_b,mouse,sess),"dir")~=0
+            fprintf('%s%s%s%s%s\n','Running mouse ',mouse,', session ',sess,':')
 
             % Load mat files
             load(fullfile(mat_dir_r,mouse,sess,"session_reaching_data_paw.mat"),'reaches');
-            load(fullfile(mat_dir_b,mouse,sess,"behavior_fundamentals.mat"),'bhv');   
+            load(fullfile(mat_dir_b,mouse,sess,"behavior_fundamentals.mat"),'bhv');
+
+
+
 
             r1_D_idx = find(bhv.DCnD_inVec_idx==1 & bhv.cat_reach_inVec==1);
             r1_C_idx = find(bhv.DCnD_inVec_idx==2 & bhv.cat_reach_inVec==1);
@@ -66,9 +71,12 @@ for m=1:length(animals)
             reaches1_px_loc(:,:,1:length(r1_C_idx),s,m) = bhv.reaches_inVec_px(:,:,r1_C_idx);
             reaches1_px_loc(:,:,1:length(r1_nD_idx),s,m) = bhv.reaches_inVec_px(:,:,r1_nD_idx);
 
-            n_reaches_loc(1,s,m) = length(find(bhv.DCnD_inVec_idx==1 & ));
-            n_reaches_loc(2,s,m) = length(find(bhv.DCnD_inVec_idx==2));
-            n_reaches_loc(3,s,m) = length(find(bhv.DCnD_inVec_idx==3));
+            n_reaches_loc(1,s,m) = length(find(bhv.DCnD_inVec_idx==1 ...
+                & bhv.cat_reach_inVec==1 | bhv.cat_reach_inVec==2));
+            n_reaches_loc(2,s,m) = length(find(bhv.DCnD_inVec_idx==2 ...
+                & bhv.cat_reach_inVec==1 | bhv.cat_reach_inVec==2));
+            n_reaches_loc(3,s,m) = length(find(bhv.DCnD_inVec_idx==3 ...
+                & bhv.cat_reach_inVec==1 | bhv.cat_reach_inVec==2));
 
             n_reaches_loc_LCR(1,s,m) = length(find(bhv.LCR_inVec_idx==1));
             n_reaches_loc_LCR(2,s,m) = length(find(bhv.LCR_inVec_idx==2));
@@ -94,14 +102,14 @@ for m=1:length(animals)
             duration_f_loc(1:length(r1_D_idx),1,s,m) = duration_f_tmp_inVec(r1_D_idx);
             duration_f_loc(1:length(r1_C_idx),2,s,m) = duration_f_tmp_inVec(r1_C_idx);
             duration_f_loc(1:length(r1_nD_idx),3,s,m) = duration_f_tmp_inVec(r1_nD_idx);
-
+        end
     end
 end
 
 %% Figure
 % 
 sz=40;
-load(fullfile(mat_dir_r,mouse,sess,"behavior_session.mat"),'behavior');
+%load(fullfile(mat_dir_r,mouse,sess,"behavior_session.mat"),'behavior');
 clr_dom = behavior.colors.clr_dom;
 clr_center = behavior.colors.center_color;
 clr_nonDom = behavior.colors.clr_nondom;
@@ -204,15 +212,39 @@ scatter(x_jitterL,mean_durL(:),sz,clrsL,'filled','MarkerFaceAlpha',.9,'MarkerEdg
 set(gca,axeOpt{:})
 xticks([1,2,3]);
 xticklabels(['dominant paw side    ';'center               ';'non-dominant paw side'])
-ylabel('number of successful reaches')
+ylabel('duration of successful reaches')
 
 
 
 set(gcf,'Position',[2235         319        1075         474],'color','w');
 saveas(gcf,strcat(save_out,filesep,'n_reaches_hit_suc_dur.png'),'png')
-print(gcf,strcat(save_out,filesep,'n_reaches_hit_suc_dur.pdf'), '-dpdf', '-painters');
+%
+% print(gcf,strcat(save_out,filesep,'n_reaches_hit_suc_dur.pdf'), '-dpdf', '-painters');
+
+%% percentage
+
+nexttile
+boxplot(n_mean_hit,'Colors',[.9 .9 .9],'Widths',.4)
+hold on
+plot(n_mean_hit','color',[.5 .5 .5 .2], 'LineWidth',1.5);
+scatter(x_jitterR,n_mean_hitR(:),sz,clrsR,'filled','MarkerFaceAlpha',.9); hold on
+scatter(x_jitterL,n_mean_hitL(:),sz,clrsL,'filled','MarkerFaceAlpha',.9,'MarkerEdgeColor','k'); hold on
+set(gca,axeOpt{:})
+xticks([1,2,3]);
+xticklabels(['dominant paw side    ';'center               ';'non-dominant paw side'])
+ylabel('number of hit reaches')
 
 
+nexttile
+boxplot(n_mean_suc,'Colors',[.9 .9 .9],'Widths',.4)
+hold on
+plot(n_mean_suc','color',[.5 .5 .5 .2], 'LineWidth',1.5);
+scatter(x_jitterR,n_mean_sucR(:),sz,clrsR,'filled','MarkerFaceAlpha',.9); hold on
+scatter(x_jitterL,n_mean_sucL(:),sz,clrsL,'filled','MarkerFaceAlpha',.9,'MarkerEdgeColor','k'); hold on
+set(gca,axeOpt{:})
+xticks([1,2,3]);
+xticklabels(['dominant paw side    ';'center               ';'non-dominant paw side'])
+ylabel('number of successful reaches')
 %%
 tm_reach = reaches.tm_w;
 reaches1_x = squeeze(reaches1_px_loc(:,1,:,:,1,:));

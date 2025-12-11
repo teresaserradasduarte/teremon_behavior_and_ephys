@@ -60,31 +60,8 @@ end
 coords = readNPY(fullfile(ksDir, 'channel_positions.npy'));
 ycoords = coords(:,2); xcoords = coords(:,1);
 
-% spike positions
-if  exist(fullfile(ksDir, 'spike_positions.npy'),"file")
-    spikePositions = readNPY(fullfile(ksDir, 'spike_positions.npy')); %0idx
-else
-    spikePositions = [];
-end
 
-if ~isempty(spikePositions)
-        spikeDepths = spikePositions(:,2);
 
-elseif ~isempty(pcFeat)
-    pcFeat = squeeze(pcFeat(:,1,:)); % take first PC only
-    pcFeat(pcFeat<0) = 0; % some entries are negative, but we don't really want to push the CoM away from there.
-    % which channels for each spike?
-    spikeFeatInd = pcFeatInd(spikeTemplates+1,:);
-    
-
-    % ycoords of those channels?
-    spikeFeatYcoords = ycoords(spikeFeatInd+1); % 2D matrix of size #spikes x 12
-
-    % center of mass is sum(coords.*features)/sum(features)
-    spikeDepths = sum(spikeFeatYcoords.*pcFeat.^2,2)./sum(pcFeat.^2,2);
-else
-    spikeDepths= [];
-end
 
 % Quality of clusters: exclude noise
 cgsFile = '';

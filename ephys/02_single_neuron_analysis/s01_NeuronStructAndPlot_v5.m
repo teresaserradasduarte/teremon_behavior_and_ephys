@@ -1,13 +1,16 @@
 %% Get neuron struct
 clear; close all; clc
 
+
 %% Manage paths
 person = 'teresa';
 %person = 'simon';
 if strcmp(person,'teresa')
     behavior_root ='D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\data\TD\behavior_data\raw_data';
     %ephys_root = 'E:'; %group_ephys = '20230801_ChocolateGroup';
-    ephys_root = 'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\';
+    %ephys_root = 'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\';
+    ephys_root = 'F:\curated_ephys_data\20230801_ChocolateGroup\';
+    %ephys_root ='Y:\shared-paton\teremon\ephys_curated\20230801_ChocolateGroup\';
     %ephys_root = 'G:\ePhys\'; %group_ephys = '20230801_ChocolateGroup';
 elseif strcmp(person,'simon')
     behavior_root ='D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\data\TD\behavior_data\raw_data';
@@ -26,27 +29,27 @@ animal_idx = 4;
 mouse = sprintf('%i_%s',animal_idx,animals{animal_idx});
 ephys_root = strcat(ephys_root,mouse);
 
-session = 'R7';
-ephys_sess = '21082023_Milka_StrCer_S7_g0';
-imec_id = 1; % <---HERE!!!!!
+session = 'R1';
+ephys_sess = '29082023_Lindt_StrCer_S7_g0';
+imec_id = 0; % <---HERE!!!!!
 
 %catGT_folder = 'catGT_KS_DSRemoved';
 %sorter_folder = 'catGT\kilosort4';
-sorter_folder = 'ibl_sorter_results';
+sorter_folder = 'ibl_sorter_results_driftAdapt20';
 output_folder_name = 'neurons_overview';
 
 %% PARAMETERS TO DEFINE!!
 % To run / save
-show_aux_plots = 1;
+show_aux_plots = 0;
 save_mat_flag = 1;
-plot_neuron_fig = 1;
+plot_neuron_fig = 0;
 use_inferred_reach_times = 0;
 
 % IF CRASHED, until which trial to consider for synccing (USED FOR SYNCING
 % ONLY) or which trials to exclude
 cut_sess_sync_flag = false;
 flag_remove_initial_trials_sync = false;
-%cut_sess_trial_sync = 197;
+%cut_sess_trial_sync = 115;
 
 neurons_params.flags_syncExeption.cut_sess_sync_flag = cut_sess_sync_flag;
 neurons_params.flags_syncExeption.flag_remove_initial_trials_sync = flag_remove_initial_trials_sync;
@@ -112,7 +115,7 @@ eventTime_ind_down = find(diff([0,syncDat])<-1);
 eventTimes_realTrial_ephys = eventTimes_water_giv(2:end);
 eventTimes_realTrial_harp = behavior.sync.time_newTrial_log(2:end);
 
-% In case some crashing happen, and the rest of session needs to be
+%% In case some crashing happen, and the rest of session needs to be
 % discarted
 if cut_sess_sync_flag == true
     eventTimes_realTrial_ephys = eventTimes_realTrial_ephys(1:cut_sess_trial_sync);
