@@ -1,15 +1,14 @@
 %% Get neuron struct
 clear; close all; clc
 
-
 %% Manage paths
 person = 'teresa';
 %person = 'simon';
 if strcmp(person,'teresa')
     behavior_root ='D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\data\TD\behavior_data\raw_data';
     %ephys_root = 'E:'; %group_ephys = '20230801_ChocolateGroup';
-    %ephys_root = 'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\';
-    ephys_root = 'F:\curated_ephys_data\20230801_ChocolateGroup\';
+    ephys_root = 'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\';
+    %ephys_root = 'F:\curated_ephys_data\20230801_ChocolateGroup\';
     %ephys_root ='Y:\shared-paton\teremon\ephys_curated\20230801_ChocolateGroup\';
     %ephys_root = 'G:\ePhys\'; %group_ephys = '20230801_ChocolateGroup';
 elseif strcmp(person,'simon')
@@ -30,26 +29,26 @@ mouse = sprintf('%i_%s',animal_idx,animals{animal_idx});
 ephys_root = strcat(ephys_root,mouse);
 
 session = 'R1';
-ephys_sess = '29082023_Lindt_StrCer_S7_g0';
+ephys_sess = '15082023_Milka_StrCer_S1_g0';
 imec_id = 0; % <---HERE!!!!!
 
 %catGT_folder = 'catGT_KS_DSRemoved';
 %sorter_folder = 'catGT\kilosort4';
-sorter_folder = 'ibl_sorter_results_driftAdapt20';
-output_folder_name = 'neurons_overview';
+sorter_folder = 'ibl_sorter_results';
+output_folder_name = 'neurons_overview_postFinal';
 
 %% PARAMETERS TO DEFINE!!
 % To run / save
-show_aux_plots = 0;
+show_aux_plots = 1;
 save_mat_flag = 1;
-plot_neuron_fig = 0;
+plot_neuron_fig = 1;
 use_inferred_reach_times = 0;
 
 % IF CRASHED, until which trial to consider for synccing (USED FOR SYNCING
 % ONLY) or which trials to exclude
-cut_sess_sync_flag = false;
+cut_sess_sync_flag = true;
 flag_remove_initial_trials_sync = false;
-%cut_sess_trial_sync = 115;
+cut_sess_trial_sync = 137;
 
 neurons_params.flags_syncExeption.cut_sess_sync_flag = cut_sess_sync_flag;
 neurons_params.flags_syncExeption.flag_remove_initial_trials_sync = flag_remove_initial_trials_sync;
@@ -106,7 +105,7 @@ syncDat = extractSyncChannel(ephys_LFP_path, nChansInFile, syncChanIndex);
 
 lfpFs = meta_lf.imSampRate;
 eventTimes = spikeGLXdigitalParse(syncDat, lfpFs);
-eventTimes_water_giv = eventTimes{7}{1};
+eventTimes_water_giv = eventTimes{10}{1};
 
 eventTime_ind = find(diff([0,syncDat])~=0);
 eventTime_ind_up = find(diff([0,syncDat])>1);
@@ -167,7 +166,9 @@ if flag_remove_initial_trials_sync==true
 end
 
 % FIT
-f=fit(eventTimes_realTrial_ephys,eventTimes_realTrial_harp,'poly1');
+fi=polyfit(eventTimes_realTrial_ephys,eventTimes_realTrial_harp,1);
+f.p1=fi(1); f.p2=fi(2); 
+%f=fit('poly1',eventTimes_realTrial_ephys,eventTimes_realTrial_harp);
 tm_bhv2ephys =  @(eventTimes_realTrial_ephys)  f.p2+f.p1*eventTimes_realTrial_ephys;
 toc
 
@@ -186,7 +187,13 @@ if show_aux_plots
     axis square
 
 
-    figure, plot(f,eventTimes_realTrial_ephys,eventTimes_realTrial_harp); shg
+    % Plot
+    figure
+    y_fit = polyval(fi, eventTimes_realTrial_ephys);
+    plot(eventTimes_realTrial_ephys, eventTimes_realTrial_harp, 'ko', 'DisplayName', 'Data'); hold on
+    plot(eventTimes_realTrial_ephys, y_fit, 'r-', 'LineWidth', 2, 'DisplayName', 'Linear fit')
+    shg
+    %figure, plot(f,eventTimes_realTrial_ephys,eventTimes_realTrial_harp); shg
     ylabel('trial time on harp'); xlabel('trial time on ephys');
     title(sprintf('%s%.5f','slop = ',f.p1));
 end
