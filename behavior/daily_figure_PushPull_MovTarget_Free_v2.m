@@ -24,8 +24,8 @@ mouse = sprintf('%i_%s',animal_idx,animals{animal_idx});
 
         
 % SESSION
-session = 'R7';
-flag_no_sync = 0;
+session = 'R1';
+flag_no_sync = 1;
 
 % DISPLAY LENGTH
 % Sherten session to display (discart unengaged trials)
@@ -44,7 +44,7 @@ searchstr_log = '*GlobalLogInt';
 searchstr_load_cells = '*paws_loadCells';
 searchstr_cam = '*Camera1Timestamp';
 searchstr_water_pos = '*WaterPosition_steps';
-searchstr_syncfix = '*syncfixNO'; % remove the NO if what to use
+searchstr_syncfix = '*syncfix'; % remove the NO if what to use
 
 
 % Files
@@ -60,7 +60,6 @@ if ~isempty(files_syncfix)
 else
     flag_realigned_rwd = 0;
 end
-
 
 %% READ LOG
 % read log file and write on it
