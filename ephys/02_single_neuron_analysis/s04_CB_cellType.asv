@@ -1,0 +1,306 @@
+%% CEREBELLUM CELL-TYPE
+clear; close all; clc
+
+%% %% Load data
+% Group and individual
+rootdir = 'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\';
+group = '20230801_ChocolateGroup';
+ephys_path = fullfile(rootdir, "ephys_data/",group);
+animals = {...
+    'CoteDor',...
+    'Lindt',...
+    'Toblerone',...
+    'Milka',...
+    'FerreroRocher'};
+n_mice = length(animals);
+n_sess = 7;
+
+%% Load
+% load list of paths
+load(fullfile(ephys_path,'teremon_paths.mat'))
+
+% Initialize struct for cell types
+all_CB_cellID = [];
+all_DCN_cellID = [];
+is_CS_in_DCN = nan(n_mice,n_sess);
+
+% Select mouse and session
+for animal_idx = 1:n_mice
+    %animal_idx = 3;
+
+    for s = 1:n_sess
+        %s = 3;
+        mouse = sprintf('%i_%s',animal_idx,animals{animal_idx});
+        mouse_path = fullfile(rootdir,"ephys_and_behavior","mat_files",group,mouse);
+        sess = sprintf('%s%i','R',s);
+        sess_path = fullfile(mouse_path,sess);
+
+        if exist(fullfile(sess_path,'eg_neurons_CB.mat'),'file') ~=0
+
+            fprintf('%s%s%s%i\n','Running ',mouse,' session R',s)
+            load(fullfile(sess_path,'eg_neurons_CB.mat'))
+
+            % out path
+            out_path = fullfile(rootdir,"ephys_and_behavior","out_files/",group,mouse,sess,'CB/',"cell_ids");
+            if ~exist(out_path,"dir"), mkdir(out_path); end
+
+
+            %% Find cell id from ephys path, build table
+
+            % REGION: load "cluster_channel_region_map.txt" ----------
+            match_idx = find(contains(files_curation_CB, animals{animal_idx}, 'IgnoreCase', true) & ...
+                contains(files_curation_CB, sprintf('S%d', s), 'IgnoreCase', true));
+            if ~isempty(match_idx)
+                CB_folder_path = files_curation_CB{match_idx};
+                % Cell type
+                cell_id_table = readtable(fullfile(CB_folder_path, 'cluster_predicted_cell_type.tsv'), ...
+                    'FileType', 'text','Delimiter', '\t');
+                cell_conf = readtable(fullfile(CB_folder_path, 'cluster_confidence_ratio.tsv'), ...
+                    'FileType', 'text','Delimiter', '\t');
+                cell_pred_prob = readtable(fullfile(CB_folder_path, 'cluster_pred_probability.tsv'), ...
+                    'FileType', 'text','Delimiter', '\t');
+                cell_votes = readtable(fullfile(CB_folder_path, 'cluster_model_votes.tsv'), ...
+                    'FileType', 'text','Delimiter', '\t');
+
+                cell_metrics = join(cell_id_table, cell_conf, 'Keys', 'cluster_id');
+                cell_metrics = join(cell_metrics, cell_pred_prob, 'Keys', 'cluster_id');
+                cell_metrics = join(cell_metrics, cell_votes, 'Keys', 'cluster_id');
+            else
+                warning('No matching CB path found in list for %s, Session %d', animals{m}, s);
+            end
+
+            % Create table for each region
+            neu_eg = struct2table(eg_neurons);
+            neu = removevars(neu_eg, {'st','st_reachIdx','st_reachIdx','st_init','st_reach','st_initIdx','unitIdx','egIdx','meta','reg','depth'});
+
+
+            %% Cell type find and match
+            [matches_id, idx_id] = ismember(neu.phyID, cell_metrics.cluster_id);
+
+            % Initialize the new columns in 'neu' with empty values
+            % Use cells for text/mixed data and NaNs for numbers
+            neu.predicted_cell_type = cell(height(neu), 1);
+            neu.confidence_ratio    = NaN(height(neu), 1);
+            neu.pred_probability    = NaN(height(neu), 1);
+            neu.model_votes         = cell(height(neu), 1);
+
+            % Fill in the data for the matching rows
+            neu.predicted_cell_type(matches_id) = cell_metrics.predicted_cell_type(idx_id(matches_id));
+            neu.confidence_ratio(matches_id)    = cell_metrics.confidence_ratio(idx_id(matches_id));
+            neu.pred_probability(matches_id)    = cell_metrics.pred_probability(idx_id(matches_id));
+            neu.model_votes(matches_id)         = cell_metrics.model_votes(idx_id(matches_id));
+
+            %%  Show cell-types by region
+            sz_dot = 40;
+            box_clrAlpha = .2;
+            jitt_w = .3; % This controls how wide the points spread (0 to 1)
+
+            % 1. Clean data and parse votes
+            is_empty_type = cellfun(@isempty, neu.predicted_cell_type);
+            neu_clean = neu(~is_empty_type, :);
+            votes_str_d = neu_clean.model_votes;
+            votes_num = zeros(height(neu_clean), 1);
+            for i = 1:height(neu_clean)
+                parts = split(votes_str_d{i}, '/');
+                votes_num(i) = str2double(parts{1}) / str2double(parts{2});
+            end
+
+            % 2. Setup Figure
+            figure('Position', [100, 100, 1000, 800], 'Color', 'w');
+            t = tiledlayout(2, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
+            title(t, 'Cell Metrics Distribution by Brain Region');
+
+            % --- Plot 1: Bar Chart (Count) ---
+            nexttile;
+            g_counts = pivot(neu_clean, Columns='predicted_cell_type', Rows='brain_region', Method='count');
+            b = bar(categorical(g_counts.brain_region), table2array(g_counts(:,2:end)), 'stacked');
+            ylabel('Count');
+            title('Cell Types Count');
+            legend(g_counts.Properties.VariableNames(2:end), 'Location', 'bestoutside','Interpreter','none');
+            box off;
+
+            % --- Plot 2: Confidence Ratio ---
+            nexttile;
+            hold on;
+            % Boxplot
+            b1 = boxchart(categorical(neu_clean.brain_region), neu_clean.confidence_ratio);
+            b1.BoxFaceColor = [0.8 0.8 0.8];
+            b1.MarkerStyle = 'none';
+            b1.BoxFaceAlpha = box_clrAlpha;
+            % Swarmplot with constrained width
+            [~, ~, type_idx] = unique(neu_clean.predicted_cell_type);
+            s1 = swarmchart(categorical(neu_clean.brain_region), neu_clean.confidence_ratio, ...
+                sz_dot, type_idx, 'filled', 'XJitterWidth', jitt_w);
+            title('Confidence Ratio');
+            ylabel('Ratio');
+            box off;
+            hold off;
+
+            % --- Plot 3: Prediction Probability ---
+            nexttile;
+            hold on;
+            b2 = boxchart(categorical(neu_clean.brain_region), neu_clean.pred_probability);
+            b2.BoxFaceColor = [0.8 0.8 0.8];
+            b2.MarkerStyle = 'none';
+            b2.BoxFaceAlpha = box_clrAlpha;
+            % Swarmplot with constrained width
+            s2 = swarmchart(categorical(neu_clean.brain_region), neu_clean.pred_probability, ...
+                sz_dot, type_idx, 'filled', 'XJitterWidth', jitt_w);
+            title('Prediction Probability');
+            ylabel('Probability');
+            box off;
+            hold off;
+
+            % --- Plot 4: Model Votes ---
+            nexttile;
+            hold on;
+            b3 = boxchart(categorical(neu_clean.brain_region), votes_num);
+            b3.BoxFaceColor = [0.8 0.8 0.8];
+            b3.MarkerStyle = 'none';
+            b3.BoxFaceAlpha = box_clrAlpha;
+            % Swarmplot with constrained width
+            s3 = swarmchart(categorical(neu_clean.brain_region), votes_num, ...
+                sz_dot, type_idx, 'filled', 'XJitterWidth', jitt_w);
+            title('Model Votes (Agreement Ratio)');
+            ylabel('Vote Ratio');
+            box off;
+            hold off;
+
+            colormap(lines(max(type_idx)));
+            saveas(t,fullfile(out_path,'cell_id_per_region.png'),'png');
+
+            %% Now check cells in CB
+            neu_cb = neu(strcmp(neu.brain_region, 'CB'), :);
+
+            metrics_to_plot = {'pred_probability', 'confidence_ratio', 'model_votes'};
+
+            for m = 1:length(metrics_to_plot)
+                plot_cell_metrics(neu_cb, metrics_to_plot{m},out_path, 'CB');
+            end
+
+            %% Now check cells in DCN
+            neu_dcn = neu(strcmp(neu.brain_region, 'DCN'), :);
+            if ~isempty(neu_dcn)
+                for m = 1:length(metrics_to_plot)
+                    plot_cell_metrics(neu_dcn, metrics_to_plot{m},out_path, 'DCN');
+                end
+            end
+
+            %% Add criteria for CB and DCN
+            ths_votes =.94;
+            ths_pred_prob = 0.6;
+
+            % CB
+            % Convert votes in numbers
+            raw_votesc = neu_cb.model_votes;
+            is_bad_cellc = cellfun(@isnumeric, raw_votesc);
+            raw_votesc(is_bad_cellc) = {'NaN'};
+            votes_str_c = string(raw_votesc);
+            votes_val_c = arrayfun(@str2num, votes_str_c);
+
+            % create table
+            cb_cellID = table(neu_cb.phyID, 'VariableNames',{'phyID'});
+            cb_cellID.cell_type = neu_cb.predicted_cell_type;
+
+            % apply criteria (only to MF, add to others later in case of need!
+            cb_isInValid = isnan(votes_val_c);
+            cb_isInValid((strcmp(cb_cellID.cell_type, 'MFB') & votes_val_c<ths_votes)) = 1;
+            cb_cellID.cell_type(cb_isInValid) = {'NaN'};
+
+            % CHECK low votes
+            % mf_lowVote = cb_cellID(strcmp(cb_cellID.cell_type, 'MFB') & votes_val_c<ths_votes,:);
+            % cs_lowVote = cb_cellID(strcmp(cb_cellID.cell_type, 'PkC_cs') & votes_val_c<ths_votes,:);
+            % ss_lowVote = cb_cellID(strcmp(cb_cellID.cell_type, 'PkC_ss') & votes_val_c<ths_votes,:);
+            % mli_lowVote = cb_cellID(strcmp(cb_cellID.cell_type, 'MLI') & votes_val_c<ths_votes,:);
+
+            % DCN
+            % Convert votes in numbers
+            raw_votesd = neu_dcn.model_votes;
+            is_bad_celld = cellfun(@isnumeric, raw_votesd);
+            raw_votesd(is_bad_celld) = {'NaN'};
+            votes_str_d = string(raw_votesd);
+            votes_val_d = arrayfun(@str2num, votes_str_d);
+
+            % apply criteria
+            dcn_isValid = (votes_val_d>=ths_votes) & ...
+                (neu_dcn.pred_probability>ths_pred_prob);
+            cs_in_DCN = neu_dcn(strcmp(neu_dcn.predicted_cell_type, 'PkC_cs'),:);
+            if height(cs_in_DCN)>0, fprintf('COMPLEX SPIKES IN DCN!!!! REVISIT TRACKING!\n'); end
+
+            dcn_cellID = table(neu_dcn.phyID, 'VariableNames',{'phyID'});
+            dcn_cellID.cell_type = repmat({NaN},height(neu_dcn),1);
+            dcn_cellID.cell_type(dcn_isValid & strcmp(neu_dcn.predicted_cell_type, 'MFB')) = {'DCN_MF'};
+            dcn_cellID.cell_type(dcn_isValid & strcmp(neu_dcn.predicted_cell_type, 'PkC_ss')) = {'DCN_PCproj'};
+
+
+            %% Save mat with file cell id-related information
+            cb_cell_type = table2struct(neu_cb);
+            dcn_cell_type = table2struct(neu_dcn);
+            save(fullfile(sess_path,'cell_type_CB.mat'),'cb_cell_type','dcn_cell_type',...
+                'ths_votes','ths_pred_prob','cb_isInValid');
+
+            %% SAVE mat files with cell id, add to eg_neurons the ids only
+            % Check if 'cell_type' already exists in the struct
+            if isfield(eg_neurons, 'cell_type')
+                fprintf('Skipping save: "cell_type" field already exists.\n');
+            else
+
+                all_cell_types = [cb_cellID; dcn_cellID];
+                neu_eg = outerjoin(neu_eg, all_cell_types, 'Keys', 'phyID', ...
+                    'MergeKeys', true, 'Type', 'left');
+                eg_neurons = table2struct(neu_eg);
+
+                fprintf('Updating the eg_neurons.mat variable to include cell_type...\n');
+                save(fullfile(sess_path,strcat('eg_neurons_CB.mat')),'eg_neurons','-append');
+            end
+
+
+            %% Do concat all DCN and CB struct
+
+            fprintf('Saving final cell ID struct for CB and DCN...\n');
+
+            cb_cellID.mouse = repmat({mouse},height(neu_cb),1);
+            cb_cellID.session = repmat({sess},height(neu_cb),1);
+            dcn_cellID.mouse = repmat({mouse},height(neu_dcn),1);
+            dcn_cellID.session = repmat({sess},height(neu_dcn),1);
+
+            cb_cellID_struct = table2struct(cb_cellID);
+            dcn_cellID_struct = table2struct(dcn_cellID);
+
+            all_CB_cellID = [all_CB_cellID;cb_cellID_struct];
+            all_DCN_cellID = [all_DCN_cellID;dcn_cellID_struct];
+            is_CS_in_DCN(animal_idx,s) = height(cs_in_DCN);
+
+            close all
+
+        end % end if exist
+    end % end session
+end % end mouse
+
+save_path = fullfile(rootdir,"ephys_and_behavior","mat_files",group);
+save(fullfile(save_path,'eg_neurons_CB_cellType'),...
+    'all_CB_cellID','all_DCN_cellID','is_CS_in_DCN','-v7.3')
+fprintf('All done!!\n');
+
+
+%% Join to eg_neurons.mat
+load(fullfile(save_path,"eg_neurons.mat"),'all_CB_neurons','all_DCN_neurons')
+
+% Add cell type to CB struct (if the phyIDs match 
+if isequal([all_CB_cellID.phyID], [all_CB_neurons.phyID])
+    [all_CB_neurons.cell_type] = all_CB_cellID.cell_type;
+    disp('Done! Cell-type added to the CB struct');
+else
+    disp('Error: phyIDs do not match or are not in the same order in CB_neurons and CB_cellID');
+end
+
+% Add cell type to DCN struct (if the phyIDs match 
+if isequal([all_DCN_cellID.phyID], [all_DCN_neurons.phyID])
+    [all_DCN_neurons.cell_type] = all_DCN_cellID.cell_type;
+    disp('Done! Cell-type added to the DCN struct');
+else
+    disp('Error: phyIDs do not match or are not in the same order in DCN_neurons and DCN_cellID');
+end
+
+save(fullfile(save_path,'eg_neurons.mat'),...
+    'all_CB_neurons','all_DCN_neuons','is_CS_in_DCN','-v7.3')

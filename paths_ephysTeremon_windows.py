@@ -6,7 +6,7 @@ root_path = 'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\D
 
 
  # ks4
-files_manual_curation_CB = [
+files_curation_CB = [
     # Côte d'Or S1,
     r"1_CoteDor\02082023_CoteDorS1CB_g0\02082023_CoteDorS1CB_g0_imec0\catGT\kilosort4",
     # Cote D'Or S4
@@ -63,7 +63,7 @@ files_manual_curation_CB = [
     r"5_FerreroRocher\20082023_Ferrero_StrCer_S6_g0\20082023_Ferrero_StrCer_S6_g0_imec0\catGT\kilosort4"
 ]
 
-files_manual_curation_BG = [
+files_curation_BG = [
     # Côte d'Or S2,
     r"1_CoteDor\02082023_CoteDorS2Str_g0\02082023_CoteDorS2Str_g0_imec0\ibl_sorter_results",
     # Cote D'Or S3

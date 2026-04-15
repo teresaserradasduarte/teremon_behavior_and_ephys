@@ -28,27 +28,27 @@ animal_idx = 4;
 mouse = sprintf('%i_%s',animal_idx,animals{animal_idx});
 ephys_root = strcat(ephys_root,mouse);
 
-session = 'R1';
-ephys_sess = '15082023_Milka_StrCer_S1_g0';
+session = 'R4';
+ephys_sess = '18082023_Milka_StrCer_S4_g0';
 imec_id = 0; % <---HERE!!!!!
 
 %catGT_folder = 'catGT_KS_DSRemoved';
-%sorter_folder = 'catGT\kilosort4';
-sorter_folder = 'ibl_sorter_results';
+sorter_folder = 'catGT\kilosort4';
+%sorter_folder = 'ibl_sorter_results_driftAdapt40';
 output_folder_name = 'neurons_overview_postFinal';
 
 %% PARAMETERS TO DEFINE!!
 % To run / save
-show_aux_plots = 1;
+show_aux_plots = 0;
 save_mat_flag = 1;
-plot_neuron_fig = 1;
+plot_neuron_fig = 0;
 use_inferred_reach_times = 0;
 
 % IF CRASHED, until which trial to consider for synccing (USED FOR SYNCING
 % ONLY) or which trials to exclude
-cut_sess_sync_flag = true;
+cut_sess_sync_flag = false;
 flag_remove_initial_trials_sync = false;
-cut_sess_trial_sync = 137;
+%cut_sess_trial_sync = 79;
 
 neurons_params.flags_syncExeption.cut_sess_sync_flag = cut_sess_sync_flag;
 neurons_params.flags_syncExeption.flag_remove_initial_trials_sync = flag_remove_initial_trials_sync;

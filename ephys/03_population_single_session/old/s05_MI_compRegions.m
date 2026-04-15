@@ -10,13 +10,13 @@ setup = 'headfixed_dynamicTarget';
 
 %% Create path to save
 save_mat = fullfile(rootdir,"ephys_and_behavior","mat_files",group);
-save_out = fullfile(rootdir,"ephys_and_behavior","out_files",group,'group','MI');
+save_out = fullfile(rootdir,"ephys_and_behavior","out_files",group,'group','MutualInformation','compare');
 if ~exist(save_out,"dir"), mkdir(save_out); end
 if ~exist(save_mat,"dir"), mkdir(save_mat); end
 
 %% Load MI
 % BG
-load(fullfile(save_mat,"MI_BG.mat"),'mean_MI','MI_pc_score','explained_MI',...
+load(fullfile(save_mat,"MI_CP.mat"),'mean_MI','MI_pc_score','explained_MI',...
     'diff_lead_lag','diff_lead_lag_L','entropy_MIland','x_im','y_im');
 MI_mean_BG = mean_MI;
 MI_pcaScore_BG = MI_pc_score;
@@ -37,16 +37,16 @@ diff_lead_lag_L_CB = diff_lead_lag_L;
 entropy_MIland_CB = entropy_MIland;
 clear mean_MI MI_pca_score explained_MI diff_lead_lag entropy_MIland diff_lead_lag_L
 
-% CT
-load(fullfile(save_mat,"MI_CT.mat"),'mean_MI','MI_pc_score','explained_MI',...
-    'diff_lead_lag','diff_lead_lag_L','entropy_MIland');
-MI_mean_CT = mean_MI;
-MI_pcaScore_CT = MI_pc_score;
-MI_pcaExplain_CT = explained_MI;
-diff_lead_lag_CT = diff_lead_lag;
-diff_lead_lag_L_CT = diff_lead_lag_L;
-entropy_MIland_CT = entropy_MIland;
-clear mean_MI MI_pca_score explained_MI diff_lead_lag entropy_MIland diff_lead_lag_L
+% % CT
+% load(fullfile(save_mat,"MI_CT.mat"),'mean_MI','MI_pc_score','explained_MI',...
+%     'diff_lead_lag','diff_lead_lag_L','entropy_MIland');
+% MI_mean_CT = mean_MI;
+% MI_pcaScore_CT = MI_pc_score;
+% MI_pcaExplain_CT = explained_MI;
+% diff_lead_lag_CT = diff_lead_lag;
+% diff_lead_lag_L_CT = diff_lead_lag_L;
+% entropy_MIland_CT = entropy_MIland;
+% clear mean_MI MI_pca_score explained_MI diff_lead_lag entropy_MIland diff_lead_lag_L
 
 % Figure params
 axeOpt = {'linewidth',1.5,'box','off','GridAlpha',...
@@ -199,7 +199,7 @@ histogram(diff_lead_lag_BG,'BinWidth',bin_size,'Normalization','pdf','FaceColor'
 histogram(diff_lead_lag_CB,'BinWidth',bin_size,'Normalization','pdf','FaceColor',cb_clr,'EdgeColor','none','FaceAlpha',0.5);hold off
 xline(mean(diff_lead_lag_BG),'-','color',[bg_clr .5],'LineWidth',2)
 xline(mean(diff_lead_lag_CB),'-','color',[cb_clr .5],'LineWidth',2)
-xlim([-1 .8])
+xlim([-.8 .8])
 xline(0,'--','color',[.8 .8 .8],'LineWidth',1.5)
 set(gca,axeOpt{:})
 xlabel('mean MI lead - lag (a.u.)'); ylabel('pdf')

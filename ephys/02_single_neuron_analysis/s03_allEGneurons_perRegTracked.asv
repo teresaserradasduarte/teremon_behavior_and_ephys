@@ -1,0 +1,248 @@
+%% NEURONS STEP 3
+% after tracking the probe with histology
+% location of each cell is added
+% create a struct per regionDD
+clear; close all; clc
+
+%% %% Load data
+% Group and individual
+rootdir = 'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\';
+group = '20230801_ChocolateGroup';
+animals = {...
+    'CoteDor',...
+    'Lindt',...
+    'Toblerone',...
+    'Milka',...
+    'FerreroRocher'};
+n_mice = length(animals);
+n_sess = 7;
+
+%% Load list of path for each
+ephys_path = fullfile(rootdir, "ephys_data/",group);
+load(fullfile(ephys_path,'teremon_paths.mat'))
+
+%% run though mice and sess
+
+n_good_neu = nan(n_mice,n_sess,2);
+n_mua_neu = nan(n_mice,n_sess,2);
+n_eg_neu = nan(n_mice,n_sess,2);
+
+% BG probe
+all_CTX_neurons = [];
+all_CP_neurons = [];
+
+% CB probe
+all_CB_neurons = [];
+all_DCN_neurons = [];
+all_BS_neurons = [];
+all_MB_neurons = [];
+all_P_neurons = [];
+
+
+for m=1:length(animals)
+    %m=3;
+    animal_idx = m;
+    mouse = sprintf('%i_%s',animal_idx,animals{animal_idx});
+    fprintf('%s%s%s\n','Running ',mouse,'...')
+
+    mouse_path = fullfile(rootdir,"ephys_and_behavior","mat_files",group,mouse);
+
+    for s=1:n_sess
+        %s=3;
+        sess = sprintf('%s%i','R',s);
+        sess_path = fullfile(mouse_path,sess);
+
+        % Run through sessions
+        if exist(sess_path,'dir')~=0
+            fprintf('%s%s:\n','Running session ',sess)
+            load(fullfile(sess_path,'behavior_fundamentals.mat'))
+
+            % ----------------------------------------------------------------------------------
+            % BASAL GANGLIA PROBE
+            % ----------------------------------------------------------------------------------
+            if exist(fullfile(sess_path,'eg_neurons_BG.mat'), 'file')~=0
+                fprintf('%s\n','BG probe')
+                load(fullfile(sess_path,'eg_neurons_BG.mat'))
+
+                % Count neurons
+                n_good_neu(m,s,1) = eg_neurons(1).meta.n_good;
+                n_mua_neu(m,s,1) = eg_neurons(1).meta.n_mua;
+                n_eg_neu(m,s,1) = length(eg_neurons);
+
+                % REGION: load "cluster_channel_region_map.txt" ----------
+                % Find the matching path in the BG list
+                match_idx = find(contains(files_curation_BG, animals{m}, 'IgnoreCase', true) & ...
+                    contains(files_curation_BG, sprintf('S%d', s), 'IgnoreCase', true));
+                if ~isempty(match_idx)
+                    bg_folder_path = files_curation_BG{match_idx};
+                    map_file_path = fullfile(bg_folder_path, 'cluster_channel_region_map.txt');
+                    %Load the file
+                    fprintf('Loading BG map: %s\n', map_file_path);
+                    bg_cluster_map = readtable(map_file_path);
+                else
+                    warning('No matching BG path found in list for %s, Session %d', animals{m}, s);
+                end
+
+
+                % Create table for each region
+                neu_eg = struct2table(eg_neurons);
+
+                % Find the region
+                [matches, idx] = ismember(neu_eg.phyID, bg_cluster_map.cluster_id);
+                neu_eg.brain_region(matches) = bg_cluster_map.brain_region(idx(matches));
+                fprintf('Successfully assigned regions to %d neurons, and %d unmatched.\n', sum(matches),sum(matches==0));
+
+                % Check if 'brain_region' already exists in the struct AND there are 0 unmatched
+                if isfield(eg_neurons, 'brain_region') && sum(matches==0) == 0
+                    fprintf('Skipping save: "brain_region" already exists and all neurons matched.\n');
+                else
+                    % IMPORTANT: Since you modified the table 'neu_eg', you must convert it
+                    % back to the struct 'eg_neurons' before saving, otherwise you save the old data.
+                    eg_neurons = table2struct(neu_eg);
+
+                    fprintf('Updating the eg_neurons.mat variable to include region...\n');
+                    save(fullfile(sess_path,strcat('eg_neurons_BG.mat')),'eg_neurons','-append');
+                end
+
+
+                fprintf('Adding neurons to a struct for each region...\n');
+                % Add behavioral variables, remove non critical neu stuff
+                neu = removevars(neu_eg, {'st','st_reachIdx','st_reachIdx','st_init','st_reach','st_initIdx','unitIdx','egIdx','CCG_bins','CCG','templateID','templateWeight','templatePeakCh','templateWaveforms','meta','reg','depth'});
+                neu.idx_init_vPP_invPP = repmat(bhv.valPushPull_invalPushPull_idx,[1 size(neu,1)])';
+                neu.DCnD_init = repmat(bhv.DCnD_init,[1 size(neu,1)])';
+                neu.idx_reach_cat = repmat(bhv.cat_reach_inVec,[1 size(neu,1)])';
+                neu.idx_reach_hit = repmat(bhv.hit_inVec,[1 size(neu,1)])';
+                neu.idx_reach_succ = repmat(bhv.suc_inVec,[1 size(neu,1)])';
+                neu.idx_reach_hDCnD =  repmat(bhv.DCnD_inVec_idx,[1 size(neu,1)])';
+                neu.idx_reach_LCR =  repmat(bhv.LCR_inVec_idx,[1 size(neu,1)])';
+                neu.idx_reach_PP =  repmat(bhv.pp_inVec_idx,[1 size(neu,1)])';
+                neu.reach_px = repmat({bhv.reaches_inVec_px},size(neu,1),1);
+                neu.mouse = repmat(mouse,[size(neu,1),1]);
+                neu.sess = repmat(sess,[size(neu,1),1]);
+
+                % Neu struct for each region, less info but with bhv
+                CP_idx = neu.brain_region == "CP";
+                CTX_idx = neu.brain_region == "CTX";
+                neu_CP = neu(CP_idx,:);
+                neu_CTX = neu(CTX_idx,:);
+                neurons_CP = table2struct(neu_CP);
+                neurons_CTX = table2struct(neu_CTX);
+
+                % Mat with all neurons together
+                all_CTX_neurons = [all_CTX_neurons;neurons_CTX];
+                all_CP_neurons = [all_CP_neurons;neurons_CP];
+
+                clear eg_neurons neu_eg neu
+
+            end % exist region probe
+
+
+            % ----------------------------------------------------------------------------------
+            % CEREBELLUM PROBE
+            % ----------------------------------------------------------------------------------
+            if exist(fullfile(sess_path,'eg_neurons_CB.mat'), 'file')~=0
+                fprintf('%s\n','CB probe')
+                load(fullfile(sess_path,'eg_neurons_CB.mat'))
+
+                % Count neurons
+                n_good_neu(m,s,2) = eg_neurons(1).meta.n_good;
+                n_mua_neu(m,s,2) = eg_neurons(1).meta.n_mua;
+                n_eg_neu(m,s,2) = length(eg_neurons);
+
+                % REGION: load "cluster_channel_region_map.txt" ----------
+                % Find the matching path in the CB list
+                match_idx = find(contains(files_curation_CB, animals{m}, 'IgnoreCase', true) & ...
+                    contains(files_curation_CB, sprintf('S%d', s), 'IgnoreCase', true));
+                if ~isempty(match_idx)
+                    CB_folder_path = files_curation_CB{match_idx};
+                    map_file_path = fullfile(CB_folder_path, 'cluster_channel_region_map.txt');
+                    %Load the file
+                    fprintf('Loading CB map: %s\n', map_file_path);
+                    cb_cluster_map = readtable(map_file_path);
+                else
+                    warning('No matching CB path found in list for %s, Session %d', animals{m}, s);
+                end
+
+                % Create table for each region
+                neu_eg = struct2table(eg_neurons);
+
+                % Find the region
+                [matches, idx] = ismember(neu_eg.phyID, cb_cluster_map.cluster_id);
+                neu_eg.brain_region(matches) = cb_cluster_map.brain_region(idx(matches));
+                fprintf('Successfully assigned regions to %d neurons, and %d unmatched.\n', sum(matches),sum(matches==0));
+
+                % Check if 'brain_region' already exists in the struct AND there are 0 unmatched
+                if isfield(eg_neurons, 'brain_region') && sum(matches==0) == 0
+                    fprintf('Skipping save: "brain_region" already exists and all neurons matched.\n');
+                else
+                    % IMPORTANT: Since you modified the table 'neu_eg', you must convert it
+                    % back to the struct 'eg_neurons' before saving, otherwise you save the old data.
+                    eg_neurons = table2struct(neu_eg);
+
+                    fprintf('Updating the eg_neurons.mat variable to include region...\n');
+                    save(fullfile(sess_path,strcat('eg_neurons_CB.mat')),'eg_neurons','-append','-v7.3');
+                end
+
+                fprintf('Adding neurons to a struct for each region...\n');
+                % Add behavioral variables, remove non critical neu stuff
+                neu = removevars(neu_eg, {'st','st_reachIdx','st_reachIdx','st_init','st_reach','st_initIdx','unitIdx','egIdx','CCG_bins','CCG','templateID','templateWeight','templatePeakCh','templateWaveforms','meta','reg','depth'});
+                neu.idx_init_vPP_invPP = repmat(bhv.valPushPull_invalPushPull_idx,[1 size(neu,1)])';
+                neu.DCnD_init = repmat(bhv.DCnD_init,[1 size(neu,1)])';
+                neu.idx_reach_cat = repmat(bhv.cat_reach_inVec,[1 size(neu,1)])';
+                neu.idx_reach_hit = repmat(bhv.hit_inVec,[1 size(neu,1)])';
+                neu.idx_reach_succ = repmat(bhv.suc_inVec,[1 size(neu,1)])';
+                neu.idx_reach_hDCnD =  repmat(bhv.DCnD_inVec_idx,[1 size(neu,1)])';
+                neu.idx_reach_LCR =  repmat(bhv.LCR_inVec_idx,[1 size(neu,1)])';
+                neu.idx_reach_PP =  repmat(bhv.pp_inVec_idx,[1 size(neu,1)])';
+                neu.reach_px = repmat({bhv.reaches_inVec_px},size(neu,1),1);
+                neu.mouse = repmat(mouse,[size(neu,1),1]);
+                neu.sess = repmat(sess,[size(neu,1),1]);
+
+                % Neu struct for each region, less info but with bhv
+                CB_idx = neu.brain_region == "CB";
+                DCN_idx = neu.brain_region == "DCN";
+                BS_idx = neu.brain_region == "BS";
+                MB_idx = neu.brain_region == "MB";
+                P_idx = neu.brain_region == "P";
+
+                neu_CB = neu(CB_idx,:);
+                neu_DCN = neu(DCN_idx,:);
+                neu_BS = neu(BS_idx,:);
+                neu_MB = neu(MB_idx,:);
+                neu_P = neu(P_idx,:);
+
+                neurons_CB = table2struct(neu_CB);
+                neurons_DCN = table2struct(neu_DCN);
+                neurons_BS = table2struct(neu_BS);
+                neurons_MB = table2struct(neu_MB);
+                neurons_P = table2struct(neu_P);
+
+                % Mat with all neurons together
+                all_CB_neurons = [all_CB_neurons;neurons_CB];
+                all_DCN_neurons = [all_DCN_neurons;neurons_DCN];
+                all_BS_neurons = [all_BS_neurons;neurons_BS];
+                all_MB_neurons = [all_MB_neurons;neurons_MB];
+                all_P_neurons = [all_P_neurons;neurons_P];
+
+                clear eg_neurons neu_eg neu
+
+            end % exist region probe
+
+        end % exist session
+
+
+    end % end session
+end % end mouse
+
+%% Save
+load(fullfile(rootdir,"ephys_and_behavior","mat_files",group,'4_Milka/R1/eg_neurons_BG.mat'),'eg_neu_FR_params');
+fprintf('%s','Saving struct with all extra-good neurons...')
+save_path = fullfile(rootdir,"ephys_and_behavior","mat_files",group);
+save(fullfile(save_path,'eg_neurons'),...
+    'all_CTX_neurons','all_CP_neurons',...
+    'all_CB_neurons','all_DCN_neurons',...
+    'all_BS_neurons','all_MB_neurons','all_P_neurons',...
+    'eg_neu_FR_params',...
+    'n_eg_neu','n_good_neu','n_mua_neu','-v7.3')
+fprintf('%s','All done!!')
+

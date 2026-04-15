@@ -5,9 +5,9 @@
 clear; close all; clc
 
 %% Select mouse, session and probe region
-animal_idx = 5;
-sess = 'R1';
-reg = 'BG'; 
+animal_idx = 1;
+sess = 'R';
+reg = 'CB';
 flag_plot_rasters = true;
 
 %% Session & ephys paths

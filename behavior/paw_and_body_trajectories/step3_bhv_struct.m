@@ -14,9 +14,14 @@ animals = {...
     'Toblerone',...
     'Milka',...
     'FerreroRocher'};
-animal_idx = 5;
+animal_idx = 1;
 mouse = sprintf('%i_%s',animal_idx,animals{animal_idx});
-sess = 'R6';
+sess = 'R1';
+
+% Parameters
+cut_trials_start = 0;
+%first_trial_idx = 1;
+%first_trial_time = 2; % in min
 
 %% paths
 rootdir = 'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD';
@@ -39,7 +44,17 @@ if ~exist(save_out,"dir"), mkdir(save_out); end
 behav_start = behavior.behavior_duration.time_start;
 behav_stop = behavior.behavior_duration.time_end + behav_start;
 last_trial = behavior.behavior_duration.trial_end;
-first_trial = 1;
+init_time = behavior.init.timeof.init_time;
+
+if (cut_trials_start == 1 && exist('first_trial_idx','var'))
+    first_trial = first_trial_idx;
+    first_trial_time = init_time(first_trial);
+elseif (cut_trials_start == 1 && exist('first_trial_time','var'))
+    tmp_min = init_time-(first_trial_time*60);
+    first_trial = find(tmp_min > 0, 1);
+else
+   first_trial = 1;
+end
 trials_vec = first_trial:last_trial;
 
 % Trial identity defined by logs
@@ -52,7 +67,7 @@ center_idx_all = behavior.reach.center_idx;
 % Event times from logs - trial init
 initiation_times_all = behavior.inputs.read_log(behavior.logs.trial_init_ind,1);
 select_start_time = initiation_times_all(first_trial);
-time_sess_end = behav_stop+10;
+time_sess_end = behav_stop;
 inva_push_times_all = behavior.inputs.read_log(behavior.logs.inval_push_ind,1);
 inva_pull_times_all = behavior.inputs.read_log(behavior.logs.inval_pull_ind,1);
 
@@ -62,23 +77,23 @@ n_reach = length(reach_times);
 
 % reach identities
 reach_trials = reaches.reach_trial-1;
-is_success = reaches.success_reach==1;
-is_hit = reaches.hit_reach==1;
-is_purpose = reaches.purpose_reach==1;
+is_success = reaches.success_reach;
+is_hit = reaches.hit_reach;
+is_purpose = reaches.purpose_reach;
 cat_reach = reaches.cat_reach;
 
 %% Events within selected trials window
 % trial identities
 push_idx = push_idx_all(push_idx_all >= first_trial & ...
-    push_idx_all<last_trial);
+    push_idx_all<=last_trial);
 pull_idx = pull_idx_all(pull_idx_all >= first_trial & ...
-    pull_idx_all<last_trial);
+    pull_idx_all<=last_trial);
 left_idx = left_idx_all(left_idx_all >= first_trial & ...
-    left_idx_all<last_trial);
+    left_idx_all<=last_trial);
 right_idx = right_idx_all(right_idx_all >= first_trial & ...
-    right_idx_all<last_trial);
+    right_idx_all<=last_trial);
 center_idx = center_idx_all(center_idx_all >= first_trial & ...
-    center_idx_all<last_trial);
+    center_idx_all<=last_trial);
 % Convert L/R to Dom/non-Dom
 if strcmp(mouse_info.paw_pref,'R')
     dom_idx = right_idx;
@@ -90,11 +105,11 @@ end
 
 % Event times
 initiation_times = initiation_times_all(initiation_times_all >= select_start_time & ...
-    initiation_times_all < time_sess_end);
+    initiation_times_all <= time_sess_end);
 inva_push_times = inva_push_times_all(inva_push_times_all >= select_start_time & ...
-    inva_push_times_all < time_sess_end);
+    inva_push_times_all <= time_sess_end);
 inva_pull_times = inva_pull_times_all(inva_pull_times_all >= select_start_time & ...
-    inva_pull_times_all < time_sess_end);
+    inva_pull_times_all <= time_sess_end);
 pp_times = cat(1,initiation_times,inva_push_times,inva_pull_times);
 init_invPush_invPull_idx = cat(1,ones(length(initiation_times),1),...
     ones(length(inva_push_times),1)*2,ones(length(inva_pull_times),1)*3);

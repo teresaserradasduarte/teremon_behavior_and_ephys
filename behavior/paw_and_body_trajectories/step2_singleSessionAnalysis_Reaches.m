@@ -19,7 +19,7 @@ animals = {...
     'FerreroRocher'};
 animal_idx = 1;
 mouse = sprintf('%i_%s',animal_idx,animals{animal_idx});
-sess = 'R7';
+sess = 'R5';
 save_flag = true;
 
 % Normalize reaches position

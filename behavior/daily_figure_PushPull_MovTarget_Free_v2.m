@@ -109,6 +109,7 @@ for i=1:n_logs
         read_log_temp(1:last_trial_available,:),...
         zeros(1,2)); 
 end
+
 ind_last_trial_available = cumsum(ind_last_trial_available_tmp);
 if size(files_load,1)>1
     ind_first_trial_available = ind_first_trial_available_tmp+...

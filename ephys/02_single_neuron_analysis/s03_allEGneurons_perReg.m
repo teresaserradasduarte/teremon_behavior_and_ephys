@@ -1,7 +1,5 @@
-%% NEURONS STEP 2
-% GET EG neurons, calculate instantaneous FR
-% align to push/pull and reach from DLC
-% neuron type?? sort to visualize?
+%% NEURONS STEP 3
+% divide by region
 clear; close all; clc
 
 %% %% Load data

@@ -16,7 +16,7 @@ animals = {...
     'Toblerone',...
     'Milka',...
     'FerreroRocher'};
-animal_idx = 5;
+animal_idx = 4;
 mouse = sprintf('%i_%s',animal_idx,animals{animal_idx});
 session_range = 'R1';
 
@@ -32,9 +32,9 @@ else
 end
 
 % Display and save
-show_plot = true;
-show_overview_reach_plot = true;
-save_fig_flag = true;
+show_plot = false;
+show_overview_reach_plot = false;
+save_fig_flag = false;
 
 % Mouse info to save
 mouse_info.group = group;
@@ -716,8 +716,8 @@ end
 % TRIAL LOOP
 disp('Finding reaches...')
 
-tt=120
-%for tt = start_trials:n_trials
+%tt=10
+for tt = start_trials:n_trials
     disp(strcat('trial ',num2str(tt)))
 
     real_tt = tt-1;
@@ -909,8 +909,8 @@ frames_timestamps_tmp = fff.p2+fff.p1*[1:siz(tt)];
     if nreaches_trial == 0
         disp(strcat('no reaches in trial',num2str(tt)))
     else
-        %for r_ind = 1:nreaches_trial
-            r_ind=1
+        for r_ind = 1:nreaches_trial
+            %r_ind=4
             % reach max rame
             rr=xmax_frame(r_ind);
             nn_max_points_tt = siz(tt);
@@ -1147,7 +1147,7 @@ frames_timestamps_tmp = fff.p2+fff.p1*[1:siz(tt)];
 
             %% CATEGORIES
             % Reach Category
-            % 1 -> resting bar
+            % 1 -> balistic from resting bar
             % 2 -> lifted paw
             % 3 -> grooming / groomung-like
             % 4 -> lifted paw: drink/reach
@@ -1638,8 +1638,8 @@ frames_timestamps_tmp = fff.p2+fff.p1*[1:siz(tt)];
             nonDomPaw_resting = cat(1,nonDomPaw_resting,is_nonDomPaw_resting);
        
         end % end of if there are reaches in trial
-    %end % end of reach loop
-%end % end trial loop
+    end % end of reach loop
+end % end trial loop
 
 
 %% SAVE VARIABLES
@@ -1816,10 +1816,10 @@ reaches.reach_params.cat_and_class.succ.max_outliers = max_outliers;
 
 
 
-% save(strcat(char(folders.mat),filesep,'session_reaching_data_paw',paw_pref,'.mat'),...
+% % save(strcat(char(folders.mat),filesep,'session_reaching_data_paw',paw_pref,'.mat'),...
+% %     'reaches','trials','session','folders','mouse_info','-v7.3')
+% save(strcat(char(folders.mat),filesep,'session_reaching_data_paw','.mat'),...
 %     'reaches','trials','session','folders','mouse_info','-v7.3')
-save(strcat(char(folders.mat),filesep,'session_reaching_data_paw','.mat'),...
-    'reaches','trials','session','folders','mouse_info','-v7.3')
 disp('Finished session!')
 
 

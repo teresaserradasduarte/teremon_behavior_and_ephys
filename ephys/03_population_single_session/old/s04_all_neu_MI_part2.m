@@ -1,4 +1,17 @@
-%% MI - part2
+clear; close all; clc
+
+%% Load data
+% Group and individual
+rootdir = 'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD';
+group = '20230801_ChocolateGroup';
+setup = 'headfixed_dynamicTarget';
+save_mat = fullfile(rootdir,"ephys_and_behavior","mat_files",group);
+
+
+%% Create path to save
+reg = 'CB';
+load(fullfile(save_mat,['MI_',reg,'.mat']));
+
 %% Do Mean and PCA
 mean_MI = mean(MI_landscaps_all,3,'omitnan');
 
@@ -6,13 +19,16 @@ mean_MI = mean(MI_landscaps_all,3,'omitnan');
 n_components = 3;
 [MI_pc_score,explained_MI] = pca2d_nanMat(MI_landscaps_all,n_components);
 
+% for ploting
+y_im = MI_struct(1).start_stop_neu(:,end,1);
+x_im = MI_struct(1).start_stop_neu(1,:,2);
+
 % Save append
 save(strcat(save_mat,filesep,'MI_',reg,'.mat'),'x_im','y_im',...
     'mean_MI','MI_pc_score','explained_MI','-append');
 
 %% Figures
-% y_im = start_stop_neu(:,end,1);
-% x_im = start_stop_neu(1,:,2);
+
 
 figure
 imagesc(x_im,y_im,mean_MI); hold on

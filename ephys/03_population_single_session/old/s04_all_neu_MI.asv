@@ -33,8 +33,8 @@ save_name = strcat('MI_',reg,'.mat');
 
 %% Load neurons
 load(fullfile(rootdir,"ephys_and_behavior/","mat_files/",group,"eg_neurons.mat"),load_struct,'eg_neu_FR_params');
-load(fullfile(rootdir,"behavior_data/","analyzed_data/mat_files/","20230511_ChocolateGroup/","headfixed_dynamicTarget/","1_CoteDor/","R6/","session_reaching_data_paw.mat"),'reaches')
-load(fullfile(rootdir,"ephys_and_behavior/","mat_files/",group,"1_CoteDor/","R6/","behavior_fundamentals.mat"));
+%load(fullfile(rootdir,"behavior_data/","analyzed_data/mat_files/","20230511_ChocolateGroup/","headfixed_dynamicTarget/","1_CoteDor/","R6/","behavior_session.mat"))
+%load(fullfile(rootdir,"behavior_data/","analyzed_data/mat_files/","20230511_ChocolateGroup/","headfixed_dynamicTarget/","1_CoteDor/","R6/","session_reaching_data_paw.mat"),'reaches')
 
 %% Neurons table
 N_tmp = struct2table(all_P_neurons);
@@ -119,7 +119,7 @@ for s = 1:height(unique_sessions)
 
     % Reach heatmaps with window of interest
     fig_name = 'full_reaches_MIwin';
-    colors_lcr=[bhv.figProp.clr_left;bhv.figProp.clr_center;bhv.figProp.clr_right];
+    colors_lcr=[behavior.colors.left_color;behavior.colors.center_color;behavior.colors.right_color];
     sz = 20;
 
     figure
@@ -240,8 +240,8 @@ for n = 1:n_neu
     MI_struct(n).entropy_joint = entropy_joint;
     MI_struct(n).MI_landscape = MI_pawEndpoint_neu;
     MI_struct(n).start_stop_neu = start_stop_neu;
-    MI_struct(n).mouse = N(n,:).mouse;
-    MI_struct(n).sess = N(n,:).sess;
+    MI_struct(n).mouse = mouse;
+    MI_struct(n).sess = sess;
     
 
     % Figures
@@ -274,5 +274,3 @@ end
 
 %
 save(strcat(save_mat,filesep,'MI_',reg,'.mat'),'MI_struct','MI_landscaps_all','-v7.3');
-
-
