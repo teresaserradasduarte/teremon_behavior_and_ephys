@@ -13,28 +13,31 @@ animals = {...
     'Toblerone',...
     'Milka',...
     'FerreroRocher'};
-reg = 'CB';
-if strcmp(reg,'BG'), load_struct = 'N_BG_all';
-elseif strcmp(reg,'CB'), load_struct = 'N_CB_all';
-elseif strcmp(reg,'CT'), load_struct = 'N_CT_all';
+reg = 'P';
+if strcmp(reg,'CP'), load_struct = 'all_CP_neurons';
+elseif strcmp(reg,'CB'), load_struct = 'all_CB_neurons';
+elseif strcmp(reg,'CTX'), load_struct = 'all_CTX_neurons';
+elseif strcmp(reg,'DCN'), load_struct = 'all_DCN_neurons';
+elseif strcmp(reg,'BS'), load_struct = 'all_BS_neurons';
+elseif strcmp(reg,'MB'), load_struct = 'all_MB_neurons';
+elseif strcmp(reg,'P'), load_struct = 'all_P_neurons';
 end
 
 
 %% Create path to save
 save_mat = fullfile(rootdir,"ephys_and_behavior","mat_files",group);
-save_out = fullfile(rootdir,"ephys_and_behavior","out_files",group,'group',reg,'MI');
+save_out = fullfile(rootdir,"ephys_and_behavior","out_files",group,'group','MutualInformation',reg);
 if ~exist(save_out,"dir"), mkdir(save_out); end
 if ~exist(save_mat,"dir"), mkdir(save_mat); end
-save_name = strcat('PCA_',reg,'.mat');
+save_name = strcat('MI_',reg,'.mat');
 
 %% Load neurons
-load(fullfile(rootdir,"ephys_and_behavior/","mat_files/",group,"all_neurons_pooled.mat"),load_struct)
-load(fullfile(rootdir,"ephys_and_behavior/","mat_files/",group,"1_CoteDor/","R6/","BG/","eg_neurons.mat"),'eg_neu_FR_params');
-load(fullfile(rootdir,"behavior_data/","analyzed_data/mat_files/","20230511_ChocolateGroup/","headfixed_dynamicTarget/","1_CoteDor/","R6/","behavior_session.mat"))
+load(fullfile(rootdir,"ephys_and_behavior/","mat_files/",group,"eg_neurons.mat"),load_struct,'eg_neu_FR_params');
 load(fullfile(rootdir,"behavior_data/","analyzed_data/mat_files/","20230511_ChocolateGroup/","headfixed_dynamicTarget/","1_CoteDor/","R6/","session_reaching_data_paw.mat"),'reaches')
+load(fullfile(rootdir,"ephys_and_behavior/","mat_files/",group,"1_CoteDor/","R6/","behavior_fundamentals.mat"));
 
 %% Neurons table
-N_tmp = struct2table(N_CT_all);
+N_tmp = struct2table(all_P_neurons);
 % exclude the only session with just neurons from the cerebellum
 exclude_idx = strcmp(N_tmp.mouse, '1_CoteDor') & strcmp(N_tmp.sess, 'R1');
 N = N_tmp(~exclude_idx, :);
@@ -116,7 +119,7 @@ for s = 1:height(unique_sessions)
 
     % Reach heatmaps with window of interest
     fig_name = 'full_reaches_MIwin';
-    colors_lcr=[behavior.colors.left_color;behavior.colors.center_color;behavior.colors.right_color];
+    colors_lcr=[bhv.figProp.clr_left;bhv.figProp.clr_center;bhv.figProp.clr_right];
     sz = 20;
 
     figure
@@ -237,6 +240,8 @@ for n = 1:n_neu
     MI_struct(n).entropy_joint = entropy_joint;
     MI_struct(n).MI_landscape = MI_pawEndpoint_neu;
     MI_struct(n).start_stop_neu = start_stop_neu;
+    MI_struct(n).mouse = N(n,:).mouse;
+    MI_struct(n).sess = N(n,:).sess;
     
 
     % Figures
@@ -270,133 +275,4 @@ end
 %
 save(strcat(save_mat,filesep,'MI_',reg,'.mat'),'MI_struct','MI_landscaps_all','-v7.3');
 
-%% Do Mean and PCA
-mean_MI = mean(MI_landscaps_all,3,'omitnan');
 
-% pca
-n_components = 3;
-[MI_pc_score,explained_MI] = pca2d_nanMat(MI_landscaps_all,n_components);
-
-% Save append
-save(strcat(save_mat,filesep,'MI_',reg,'.mat'),'x_im','y_im',...
-    'mean_MI','MI_pc_score','explained_MI','-append');
-
-%% Figures
-% y_im = start_stop_neu(:,end,1);
-% x_im = start_stop_neu(1,:,2);
-
-figure
-imagesc(x_im,y_im,mean_MI); hold on
-axis xy;
-title('Mean MI');
-c=colorbar;
-ylabel(c,'mean MI');
-xline(0,'--','color',[1 1 1],'LineWidth',1.5)
-yline(0,'--','color',[1 1 1],'LineWidth',1.5)
-ylabel('start time (s)'); xlabel('stop time (s)')
-axis square
-title('Mean MI across neurons')
-
-figure
-ff = tiledlayout(1,3);
-for pc=1:n_components
-    nexttile
-    imagesc(x_im,y_im,MI_pc_score(:,:,pc)); hold on
-    axis xy;
-    title(sprintf('%s%i%s%.2f%s','PC',pc,' (',explained_MI(pc),'%)'));
-    c=colorbar;
-    ylabel(c,'pc score');
-    xline(0,'--','color',[1 1 1],'LineWidth',1.5)
-    yline(0,'--','color',[1 1 1],'LineWidth',1.5)
-    ylabel('start time (s)'); xlabel('stop time (s)')
-end
-
-
-%% LEAD LAG
-% whithout zero
-MI_landscape_size = size(MI_landscaps_all,1);
-lead_win_start = 1:MI_landscape_size/2;
-lead_win_stop = 1:MI_landscape_size/2;
-lag_win_start = (MI_landscape_size/2)+1:MI_landscape_size;
-lag_win_stop = (MI_landscape_size/2)+1:MI_landscape_size;
-large_win_start = 1:MI_landscape_size/2;
-large_win_stop =(MI_landscape_size/2)+1:MI_landscape_size;
-MI_lead = permute(squeeze(MI_landscaps_all(lead_win_start,lead_win_stop,:)),[3 1 2]);
-MI_lag = permute(squeeze(MI_landscaps_all(lag_win_start,lag_win_stop,:)),[3 1 2]);
-diff_lead_lag = mean(MI_lead(:,:),2,'omitnan') -  mean(MI_lag(:,:),2,'omitnan');
-
-% with zero
-n_neu = size(MI_landscaps_all,3);
-[X, Y] = meshgrid(x_im, y_im); 
-idx_lead = X + Y < 0;
-idx_diag = -X==Y;
-tol = 1e-10;
-
-mask_lead = zeros(size(mean_MI));
-mask_lag = zeros(size(mean_MI));
-mask_lead(idx_lead) = true;
-mask_lag(~idx_lead) = true;
-mask_lag(abs(X + Y) < tol) = false;
-[row_idx_lead, col_idx_lead] = find(mask_lead);
-[row_idx_lag, col_idx_lag] = find(mask_lag);
-
-MI_lead_L = nan(n_neu,length(x_im),length(y_im));
-MI_lag_L = nan(n_neu,length(x_im),length(y_im));
-for nn=1:n_neu
-    MI_tmp_lead = MI_landscaps_all(:,:,nn);
-    MI_tmp_lag = MI_landscaps_all(:,:,nn);
-    MI_tmp_lead(mask_lead==0) = nan;
-    MI_tmp_lag(mask_lag==0) = nan;
-    MI_lead_L(nn,:,:) = MI_tmp_lead;
-    MI_lag_L(nn,:,:) = MI_tmp_lag;
-end
-diff_lead_lag_L = mean(MI_lead_L(:,:),2,'omitnan') -  mean(MI_lag_L(:,:),2,'omitnan');
-
-% Entropy of landscape
-   n_bins_ent = 40;
-MI_per = permute(MI_landscaps_all,[3 1 2]);
-entropy_MIland = nan(n_neu,1);
-for n = 1:n_neu
-    pLarge = histcounts(MI_per(n,:),n_bins_ent,'Normalization','probability');
-    entropy_MIland(n) = -sum(pLarge.*log2(pLarge),'omitnan');
-end
-
-% Save append
-save(strcat(save_mat,filesep,'MI_',reg,'.mat'),...
-    'diff_lead_lag','diff_lead_lag_L','entropy_MIland','-append');
-
-%% Figure
-bin_size = 0.03; 
-figure
-subplot(311)
-histogram(diff_lead_lag,'BinWidth',bin_size)
-
-subplot(312)
-histogram(diff_lead_lag_L,'BinWidth',bin_size)
-
-subplot(313)
-histogram(entropy_MIland,'BinWidth',bin_size)
-
-%% slope lead lag
-n_bins_ll = 20;
-pLead_neu = nan(n_bins_ll,n_neu);
-pLag_neu = nan(n_bins_ll,n_neu);
-
-for n = 1:n_neu
-    leadd = MI_lead_L(n,:);
-    lagg = MI_lag_L(n,:);
-    pLead_neu(:,n) = histcounts(leadd(~isnan(leadd)),n_bins_ll,'Normalization','probability');
-    pLag_neu(:,n) = histcounts(lagg(~isnan(lagg)),n_bins_ll,'Normalization','probability');
-end
-
-
-
-%%
-figure
-histogram(leadd(~isnan(leadd)),n_bins_ll); hold on
-histogram(lagg(~isnan(lagg)),n_bins_ll); hold off
-xlim([0 2])
-
-figure
-scatter(pLead_neu(:,),lagg(~isnan(lagg)),'filled')
-f=fit(eventTimes_realTrial_ephys,eventTimes_realTrial_harp,'poly1');

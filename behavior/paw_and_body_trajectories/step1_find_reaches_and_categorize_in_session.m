@@ -716,7 +716,7 @@ end
 % TRIAL LOOP
 disp('Finding reaches...')
 
-tt=120
+tt=1
 %for tt = start_trials:n_trials
     disp(strcat('trial ',num2str(tt)))
 
