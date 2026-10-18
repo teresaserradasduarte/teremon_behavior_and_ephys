@@ -1,0 +1,90 @@
+windows: 77  width=100 ms  step=25 ms
+kinematic features: ['x', 'y', 'z', 'dist_water', 'speed_water', 'PC1', 'PC2', 'speed']  |  neural variable: count
+outputs -> multiD_kin_x-y-z-dist_water-speed_water-PC1-PC2-speed/  |  vars -> multiD100_x-y-z-dist_water-speed_water-PC1-PC2-speed_ksg_multiD.pkl
+PCA on 'endpoint' fitted per 'mouse': 5 pool(s), input dim = 3
+  explained variance PC1..3 (mean over pools): [0.58  0.291 0.129]   PC1+PC2 = 87.1%
+  PCs are a rotation of [mean x, mean y, mean z] within the endpoint window -> no leakage from outside it, but PC1+PC2 drops one of the three dimensions, so expect <= x+y+z (MI is rotation-invariant).
+water features loaded: 14091/14457 reaches have a water position (97.5%); the rest become NaN and are masked out
+TEST RUN: 400 neurons | feature matrix per neuron: (n_trials, 8)
+
+comparing 6 feature sets on 400 neurons (S=10 nulls)
+union of features: ['x', 'y', 'z', 'dist_water', 'speed_water', 'PC1', 'PC2', 'speed']
+columns built for 29 sessions: ['PC1', 'PC2', 'accel', 'dist_water', 'speed', 'speed_water', 'x', 'y', 'z']
+  x+y+z+dist_water+speed_water             done in 74s
+  PC1+PC2+dist_water+speed_water           done in 64s
+  x+y+z+speed                              done in 76s
+  x+y+z                                    done in 92s
+  PC1+PC2                                  done in 77s
+  dist_water+speed_water                   done in 74s
+total 456s
+
+LOCALITY of the k-NN neighbourhoods (k=3)
+  span_frac = fraction of the data RANGE the neighbourhood covers
+              (~0.1 local, >0.4 the local-density assumption is gone)
+  N         = median usable trials per neuron
+
+features                                  d+1      N  span_frac      k/N   theory
+---------------------------------------------------------------------------------
+x+y+z+dist_water+speed_water                6    375      0.161   0.0080    0.447
+PC1+PC2+dist_water+speed_water              5    375      0.144   0.0080    0.381
+x+y+z+speed                                 5    404      0.160   0.0074    0.375
+x+y+z                                       4    404      0.121   0.0074    0.294
+PC1+PC2                                     3    404      0.076   0.0074    0.195
+dist_water+speed_water                      3    375      0.054   0.0080    0.200
+
+k sweep on x+y+z+dist_water+speed_water (d=5):
+    2      0.140       0.1379     0.1572     0.0193
+    3      0.160       0.1311     0.1467     0.0156
+    4      0.175       0.1268     0.1399     0.0131
+    6      0.207       0.1186     0.1293     0.0108
+   10      0.245       0.1073     0.1154     0.0081
+
+feature-set comparison  |  400 neurons (200/region), S=10 nulls, KSG k=3, count, mm
+EXCESS MI = observed - that set's own per-window shuffle null (bits)
+
+features                                  d     n  CP excess  CB excess     BOTH   CP t   CB t
+----------------------------------------------------------------------------------------------
+x+y+z+dist_water+speed_water              5   400     0.1160     0.1544   0.1311     50      0
+x+y+z+speed                               4   400     0.1192     0.1485   0.1285     50      0
+x+y+z                                     3   400     0.1107     0.1428   0.1217     50      0
+PC1+PC2+dist_water+speed_water            4   400     0.1121     0.1410   0.1215     50      0
+PC1+PC2                                   2   400     0.0916     0.1198   0.1005     50    -25
+dist_water+speed_water                    2   400     0.0456     0.0465   0.0461     50     50
+
+BEST: x+y+z+dist_water+speed_water  (0.1311 bits)
+
+vs BEST (negative = worse):
+  x+y+z+speed                              -0.0026 bits  (d 4 vs 5)
+  x+y+z                                    -0.0094 bits  (d 3 vs 5)
+  PC1+PC2+dist_water+speed_water           -0.0096 bits  (d 4 vs 5)
+  PC1+PC2                                  -0.0306 bits  (d 2 vs 5)
+  dist_water+speed_water                   -0.0850 bits  (d 2 vs 5)
+
+LOCALITY of the k-NN neighbourhoods (k=3)
+  span_frac = fraction of the data RANGE the neighbourhood covers
+              (~0.1 local, >0.4 the local-density assumption is gone)
+  N         = median usable trials per neuron
+
+features                                  d+1      N  span_frac      k/N   theory
+---------------------------------------------------------------------------------
+x+y+z+dist_water+speed_water                6    375      0.161   0.0080    0.447
+PC1+PC2+dist_water+speed_water              5    375      0.144   0.0080    0.381
+x+y+z+speed                                 5    404      0.160   0.0074    0.375
+x+y+z                                       4    404      0.121   0.0074    0.294
+PC1+PC2                                     3    404      0.076   0.0074    0.195
+dist_water+speed_water                      3    375      0.054   0.0080    0.200
+
+k SWEEP on x+y+z+dist_water+speed_water (d+1=6, N~375 trials)
+    k  span_frac  peak excess   peak raw  peak null
+---------------------------------------------------
+    2      0.140       0.1379     0.1572     0.0193
+    3      0.160       0.1311     0.1467     0.0156
+    4      0.175       0.1268     0.1399     0.0131
+    6      0.207       0.1186     0.1293     0.0108
+   10      0.245       0.1073     0.1154     0.0081
+
+  best k = 2 (0.1379 bits); k=3 gives 0.1311
+
+table -> D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_and_behavior\out_files\20230801_ChocolateGroup\group\MutualInformation_NEW\multiD_kin\multiD100_table.txt
+figures -> D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_and_behavior\out_files\20230801_ChocolateGroup\group\MutualInformation_NEW\multiD_kin
+saved -> D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_and_behavior\mat_files\20230801_ChocolateGroup\MutualInformation_py\multiD100.pkl

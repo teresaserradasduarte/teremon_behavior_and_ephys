@@ -30,16 +30,56 @@ def _is_hdf5(path):
 def _str_from_ref(f, ref):
     return "".join(chr(c) for c in np.asarray(f[ref]).ravel())
 
+# EMPTY ARRAYS IN A v7.3 .mat. HDF5 cannot hold MATLAB's 0x1 empty double as
+# such, so MATLAB writes a small dataset containing the array's DIMENSIONS --
+# the integers [0, 1] -- and marks it with the attribute MATLAB_empty = 1.
+# Reading that dataset as numbers returns the SIZE of the empty array as if it
+# were its content. Until 2026-10-12 _spikes_from_ref did exactly that, so every
+# trial with no spikes came back as the spike times [0.0, 1.0]: 6-9% of CP
+# trials, 0.3-0.4% of CB, and not one empty trial anywhere. The flag is now
+# honoured, and load() repairs caches parsed before the fix.
+# (19_spike_placeholder.py is the figure that shows it.)
+def _is_matlab_empty(d):
+    return bool(d.attrs.get("MATLAB_empty", 0))
+
 def _spikes_from_ref(f, ref):
+    cell = f[ref]
+    if _is_matlab_empty(cell):                 # a neuron with no trials at all
+        return []
     out = []
-    for tr in np.asarray(f[ref]).ravel():
-        spk = np.asarray(f[tr], float).ravel()
+    for tr in np.asarray(cell).ravel():
+        d = f[tr]
+        if _is_matlab_empty(d):                # a trial with no spikes: keep the
+            out.append(np.empty(0, float))     # TRIAL, with nothing in it
+            continue
+        spk = np.asarray(d, float).ravel()
         out.append(spk[np.isfinite(spk)])
     return out
 
 def _label_from_ref(f, ref, n):
-    v = np.asarray(f[ref], float).ravel()
+    d = f[ref]
+    if _is_matlab_empty(d):                    # same trap: [0, 1] is a size
+        return np.full(n, np.nan)
+    v = np.asarray(d, float).ravel()
     return v if v.size == n else np.full(n, np.nan)
+
+def repair_empty_trials(neurons):
+    """Turn trials that are exactly [0.0, 1.0] back into EMPTY trials, in place.
+    -> how many were repaired.
+
+    For pickles parsed before _spikes_from_ref honoured MATLAB_empty: those hold
+    the mis-read dimensions of an empty array where a silent trial should be.
+    The trial is emptied, never removed, so every neuron keeps its trial count
+    and order and trial k still pairs with reach_px[k] and labels[k].
+    The value rule is safe: over the whole file it selects exactly the trials
+    the MATLAB_empty flag marks, for st_init and st_reach, in CP and CB."""
+    n = 0
+    for neu in neurons:
+        spk = neu["spikes"]
+        for k, t in enumerate(spk):
+            if len(t) == 2 and t[0] == 0.0 and t[1] == 1.0:
+                spk[k] = np.empty(0, float); n += 1
+    return n
 
 def _parse_mat_h5(path, regions):
     import h5py
@@ -154,4 +194,62 @@ def load(path):
         neurons = pickle.load(f)
     with open(path.with_suffix(".reach_px.pkl"), "rb") as f:
         reach_px = pickle.load(f)
+    # A cache parsed before the MATLAB_empty fix is repaired here, in memory, so
+    # every script gets empty trials as empty without re-parsing the .mat. A
+    # cache parsed after the fix has nothing to repair and prints nothing.
+    n_fix = repair_empty_trials(neurons)
+    if n_fix:
+        n_tr = sum(len(n["spikes"]) for n in neurons)
+        print(f"mi_io.load: {n_fix}/{n_tr} trials ({100*n_fix/max(n_tr,1):.1f}%) "
+              f"were empty trials mis-read as [0.0, 1.0] -> restored to EMPTY "
+              f"(kept as trials). Re-run 01_load_data.py to fix the cache itself.")
     return neurons, reach_px
+
+
+def describe(obj, name="obj", max_depth=3, max_items=12, _depth=0, _key=None):
+    """Print the STRUCTURE of a nested dict/list/array -- what is in a pickle,
+    without expanding the VS Code Variables pane one node at a time.
+
+        import mi_io; mi_io.describe(out)
+        mi_io.describe(WATER, max_items=3)
+
+    Shows type, shape, dtype, and for numeric arrays the finite range and NaN
+    fraction (the thing you usually actually want to check).
+    """
+    import numpy as np
+    pad = "  " * _depth
+    tag = f"{_key}: " if _key is not None else f"{name}: "
+
+    if isinstance(obj, dict):
+        print(f"{pad}{tag}dict({len(obj)} keys)")
+        if _depth >= max_depth:
+            return
+        for i, (k, v) in enumerate(obj.items()):
+            if i >= max_items:
+                print(f"{pad}  ... {len(obj)-max_items} more keys")
+                break
+            describe(v, max_depth=max_depth, max_items=max_items,
+                     _depth=_depth+1, _key=repr(k) if not isinstance(k, str) else k)
+        return
+
+    if isinstance(obj, (list, tuple)):
+        print(f"{pad}{tag}{type(obj).__name__}(len {len(obj)})")
+        if len(obj) and _depth < max_depth:
+            describe(obj[0], max_depth=max_depth, max_items=max_items,
+                     _depth=_depth+1, _key="[0]")
+        return
+
+    if isinstance(obj, np.ndarray):
+        d = f"{pad}{tag}ndarray {obj.shape} {obj.dtype}"
+        if obj.size and obj.dtype.kind in "fiu":
+            a = obj[np.isfinite(obj)] if obj.dtype.kind == "f" else obj
+            nan = float(np.mean(~np.isfinite(obj))) if obj.dtype.kind == "f" else 0.0
+            if a.size:
+                d += f"  range [{a.min():.4g}, {a.max():.4g}]"
+            if nan:
+                d += f"  NaN {nan*100:.1f}%"
+        print(d)
+        return
+
+    v = repr(obj)
+    print(f"{pad}{tag}{type(obj).__name__} = {v[:70]}{'...' if len(v) > 70 else ''}")

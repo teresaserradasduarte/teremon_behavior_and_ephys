@@ -21,6 +21,13 @@ N_SHUF     = 200             # shuffle permutations
 K_LIST     = [3, 5, 7]      # k values for KSG sensitivity check
 SAVE_FIGS  = True          # save figures to disk (config.fig_dir("compare"))
 
+# The sparse-CP pair: a low-firing CP neuron that KSG says carries a lot of
+# information, and one it says carries almost none. The two are matched on mean
+# count, so the pair differs in information rather than in how much the cell
+# fires -- which is the thing binning cannot do at these counts.
+SPARSE_PCTL = 25           # CP at/below this percentile of mean count = "sparse"
+LOW_MI_PCTL = 10           # within those, the low-MI example comes from here
+
 # ── tiny helpers (reused across cells) ────────────────────────────────────────
 def ksg_mi(kin, count, k=3):
     """KSG MI in bits. count treated as continuous (+ infinitesimal jitter)."""
@@ -76,10 +83,33 @@ cp_by_mi = sorted(cp, key=lambda r: r[3], reverse=True)
 cb_by_mi = sorted(cb, key=lambda r: r[3], reverse=True)
 if cp_by_mi: picks.append(("CP best MI", cp_by_mi[0][1]))
 if cb_by_mi: picks.append(("CB best MI", cb_by_mi[0][1]))
+# --- sparse CP, high vs low MI ----------------------------------------------
+# Candidates must survive the same checks the figure applies, or the "low MI"
+# example would just be a neuron whose count never varies (MI = 0 trivially).
+_thr, _pool = np.percentile([r[2] for r in cp], SPARSE_PCTL), []
+for _r in cp:
+    if _r[2] > _thr: continue
+    _n   = NEURONS[_r[1]]
+    _kin = mi_io.endpoint_kin(_n, REACH_PX, coord=COORD, frames=FRAMES)
+    _cat = _n["labels"]["idx_reach_cat"]
+    _m   = np.isfinite(_kin) & np.isin(_cat, list(CAT_KEEP))
+    if _m.sum() < 20: continue
+    if np.unique(mi_io.counts(_n, win)[_m]).size < 2: continue
+    _pool.append(_r)
+if _pool:
+    _hi     = max(_pool, key=lambda r: r[3])
+    _lo_thr = np.percentile([r[3] for r in _pool], LOW_MI_PCTL)
+    # among the low-MI ones, take whichever fires most like the high-MI example
+    _lo     = min((r for r in _pool if r[3] <= _lo_thr),
+                  key=lambda r: abs(r[2] - _hi[2]))
+    picks += [("CP sparse high MI", _hi[1]), ("CP sparse low MI", _lo[1])]
+    print(f"sparse CP = mean count <= {_thr:.2f} ({len(_pool)} neurons); "
+          f"low-MI example drawn from MI <= {_lo_thr:.4f}")
 
 print("\npicks:")
+_row = {r[1]: r for r in neu_stats}      # neu_stats is SORTED: index by neuron id
 for label, idx in picks:
-    r = neu_stats[idx]
+    r = _row[idx]
     print(f"  {label:13s}  {NEURONS[idx]['uid']:35s}  mean_count={r[2]:.2f}  MI={r[3]:.4f}")
 
 
@@ -146,14 +176,26 @@ for label, idx in picks:
 
     # [3] p(count)
     ax = axes[3]
-    ax.hist(c_m, bins=np.arange(-0.5, maxc + 1.5), color=col, edgecolor="white")
-    ax.set(xlabel="spike count", ylabel="# trials", title="p(count)")
+    # One bin per integer only while that stays legible. Above ~40 counts the
+    # bars are thinner than their own white edges, which paint over the fill and
+    # leave the panel looking empty (a high-FR CB cell reaches maxc ~ 200).
+    if maxc <= 40:
+        _bins, _edge = np.arange(-0.5, maxc + 1.5), "white"
+    else:
+        _bins, _edge = np.linspace(-0.5, maxc + 0.5, 31), "none"
+    ax.hist(c_m, bins=_bins, color=col, edgecolor=_edge)
+    ax.set(xlabel="spike count", ylabel="# trials",
+           title=f"p(count)  [{len(_bins)-1} bins, max {maxc}]")
 
     # [4] count vs endpoint scatter
     ax = axes[4]
     ax.scatter(kin_m, c_m, s=8, color=col, alpha=0.35, linewidths=0)
     ax.set(xlabel="endpoint y (px)", ylabel="spike count",
-           title="count vs endpoint", yticks=np.arange(0, maxc + 1))
+           title="count vs endpoint")
+    # one tick per possible count only while they fit; 200 of them overlap into
+    # a solid black bar that hides the axis entirely
+    if maxc <= 20:
+        ax.set_yticks(np.arange(0, maxc + 1))
 
     plt.tight_layout()
     if SAVE_FIGS:

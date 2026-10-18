@@ -1,0 +1,27 @@
+windows: 77  width=100 ms  step=25 ms
+kinematic features: ['x', 'y', 'z', 'speed', 'dist_water']  |  neural variable: count
+outputs -> multiD_kin_x-y-z-speed-dist_water/  |  vars -> multiD100_x-y-z-speed-dist_water_ksg_multiD.pkl
+no PC in FEATURES -> PCA skipped entirely (raw coordinates need none)
+water features loaded: 14091/14457 reaches have a water position (97.5%); the rest become NaN and are masked out
+TEST RUN: 40 neurons | feature matrix per neuron: (n_trials, 5)
+    [load data + 09 setup] 2.2s
+
+2D landscape: 12 kinematic windows x 37 neural windows = 444 cells per neuron
+  KIN : win 21 fr (52.5 ms), step 8 fr (20.0 ms), centres -139..81 ms  [KIN_RANGE (-0.15, 0.1)]
+  NEUR: win 100 ms, step 25 ms, centres -450..450 ms  [range (-0.5, 0.5)]
+features: ['x', 'y', 'z', 'speed', 'dist_water']  |  neurons: 40
+kinematic stack built in 0s: (565, 12, 5) per session (trials, kin_wins, features)
+
+ETA: ~372,960 KSG calls; at ~2500 calls/s parallel that is ~2 min
+40 neurons | grid 12x37 = 444 cells
+real maps: 1.8 min
+null maps: 4.7 min
+
+statistic         REAL median  NULL median  % real > null p95                verdict
+------------------------------------------------------------------------------------
+null_maxz               14.16         6.02                88%                   GOOD
+within_maxz              3.54         8.80                 2%                USELESS
+resid_maxz              10.90         4.95                88%                   GOOD
+resid_selfz              3.42         6.03                 0%                USELESS
+
+(% real > null p95 is the detection rate at a 5% false-positive rate.)
