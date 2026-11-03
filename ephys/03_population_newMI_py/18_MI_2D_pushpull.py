@@ -101,7 +101,7 @@ PP_KEEP = (0, 1, 2, 3)   # any subset of (0, 1, 2, 3)
 #          same way for every event. Valid and invalid line up on it (21's
 #          alignment figure). Events without an onset are left out.
 # Both the kinematics/force AND the spikes are moved to the chosen zero.
-ALIGN     = "onset"      # "cue" | "onset"
+ALIGN     = "cue"      # "cue" | "onset"
 USE_CLEAN = True       # use 21's cleaning: invalid events detected while the
                        # mouse was reaching are left out. Valid events are never
                        # removed by it (they started a trial). Only matters when
@@ -123,7 +123,7 @@ KIN_WIN   = 21         # frames per kinematic window (21 @ 400 fps = 52.5 ms,
 KIN_STEP  = 8          # frames between kinematic windows (8 = 20 ms).
                        # Cost is LINEAR in the number of kin windows; 12 uses 4
                        # (10 ms) over a much shorter range.
-KIN_RANGE = (-0.20, 0.50)       # (start, stop) in SECONDS re t = 0 (see ALIGN),
+KIN_RANGE = (-0.3, 0.3)       # (start, stop) in SECONDS re t = 0 (see ALIGN),
                        # for the window CENTRES. 16 extracted [-3, 3] s, so this
                        # can be widened a long way -- but every extra row
                        # multiplies the run. Re the CUE the movement sits before
@@ -134,7 +134,7 @@ KIN_RANGE = (-0.20, 0.50)       # (start, stop) in SECONDS re t = 0 (see ALIGN),
 # ── the NEURAL window (columns) ──────────────────────────────────────────────
 WIN_WIDTH   = 0.07    # (s) width of the spike-count window
 WIN_STEP    = 0.025    # (s) step between neural windows
-WIN_RANGE   = (-0.50, 0.50)     # (s) re the PUSH/PULL, for the window CENTRES.
+WIN_RANGE   = (-0.5, 0.5)     # (s) re the PUSH/PULL, for the window CENTRES.
                        # Cost: the defaults give 40 kinematic x 37 neural windows
                        # = 1480 cells x 21 (obs + 20 nulls) = ~31k KSG calls per
                        # neuron, so ~75M over the ~2400 usable neurons, ~8 h at
@@ -1164,6 +1164,9 @@ ctx = SimpleNamespace(
 # z-scored h(lag) per mouse, robust peak and median lag with paired CB-vs-CP
 # insets, the full two-row figure and the presentation figure (PNG + PDF).
 HLAG = mi2d_figures.hlag_per_mouse(ctx, LAG_BIN=LAG_BIN, PER_MOUSE_MIN_N=PER_MOUSE_MIN_N)
+# the same two box plots (median lag, robust peak) WITH each mouse named -- the
+# figures above carry no mouse identities. PNG only.
+mi2d_figures.named_timing_boxes(ctx, HLAG)
 
 
 # %% ── 5. DIAGONAL vs NEURAL TIME ───────────────────────────────────────────

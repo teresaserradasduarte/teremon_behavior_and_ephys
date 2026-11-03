@@ -80,7 +80,7 @@ REACH_CAT = (1, )     # reach categories (idx_reach_cat) to include, e.g. (1,) f
 # names that label -- cell 3 prints how many that is.
 # The choice goes into the cache key, the cache filename and the figure folder,
 # so a filtered run cannot overwrite or silently load an unfiltered one.
-TRIAL_SELECT = None
+TRIAL_SELECT = {"succ": 1}
 
 
 # ── the KINEMATIC / BEHAVIOUR window (rows) ──────────────────────────────────
@@ -722,6 +722,15 @@ if H4B:
     BOX_JITTER  = 0.07
     INSET_SEP   = 0.55     # inset: distance between the CB and CP positions (1 = far apart)
     INSET_BOX_W = 0.22     # inset: box width, in the same units
+    # the PRESENTATION figure only:
+    PRESENT_CB_COLOR = "#F3C969"   # CB's colour in it (CP keeps the project green)
+    PRESENT_FS       = 13          # base font size (labels, ticks, texts)
+    PRESENT_DOT      = 8.5         # dot size in its inset
+    PRESENT_JITTER   = 0.11        # half-width of the sideways spread of the mice in
+                                   # its inset. Not random: the mice are spread evenly,
+                                   # in the order of their CP value, so two mice with
+                                   # nearly the same value always sit side by side
+                                   # instead of on top of each other
     _pair = [m for m in _MICE4B if all(m in PE4B.get(r, {}).get("mice", {})
                                        and m in MED4B.get(r, {}).get("mice", {})
                                        for r in ("CP", "CB"))]
@@ -737,29 +746,37 @@ if H4B:
         return ("***" if p_ < 0.001 else "**" if p_ < 0.01 else "*" if p_ < 0.05
                 else "n.s.")
 
-    def _paired_box(ax, vals, name, labels=True, compact=False, stars=False):
+    def _paired_box(ax, vals, name, labels=True, compact=False, stars=False,
+                    colors=None, present=False):
         """box + jittered points + a line per mouse, CB then CP; paired t-test.
         compact: small version for an inset (no names, one-line test, small
         fonts). stars: (compact only) mark the test with a bracket and stars
         (* p<0.05, ** p<0.01, *** p<0.001, n.s.) instead of writing t and p.
-        -> (t, p)"""
+        colors: region -> colour (default CLR). present: larger fonts and dots,
+        and the mice spread evenly sideways (PRESENT_*). -> (t, p)"""
+        _C = CLR if colors is None else colors
         # the inset (compact) is drawn square, with the two regions closer
         # together and narrower boxes; the jitter shrinks with the spacing
         _x1 = INSET_SEP if compact else 1.0
         _jt = _jit * (_x1 / 1.0) * (INSET_BOX_W / 0.45 if compact else 1.0)
+        if present:
+            _jt = np.empty(len(_pair))
+            _jt[np.argsort(vals["CP"])] = np.linspace(-PRESENT_JITTER, PRESENT_JITTER,
+                                                      len(_pair))
         bp = ax.boxplot([vals[r] for r in _order], positions=[0, _x1],
                         widths=INSET_BOX_W if compact else 0.45,
                         patch_artist=True, showfliers=False, zorder=1)
         for patch, r in zip(bp["boxes"], _order):
-            patch.set(facecolor=CLR[r], alpha=0.35, edgecolor="none")
+            patch.set(facecolor=_C[r], alpha=0.55 if present else 0.35, edgecolor="none")
         for k_ in ("whiskers", "caps", "medians"):
             for ln in bp[k_]: ln.set(color="0.3", lw=1.2)
         for j in range(len(_pair)):
             ax.plot([0 + _jt[j], _x1 + _jt[j]], [vals["CB"][j], vals["CP"][j]],
                     color="0.55", lw=1.0 if compact else 1.2, zorder=2)
         for x_, r in zip((0, _x1), _order):
-            ax.plot(x_ + _jt, vals[r], "o", ms=5 if compact else 8, color=CLR[r],
-                    mec="w", mew=0.8 if compact else 1.0, zorder=3)
+            ax.plot(x_ + _jt, vals[r], "o",
+                    ms=PRESENT_DOT if present else (5 if compact else 8), color=_C[r],
+                    mec="w", mew=1.0 if (present or not compact) else 0.8, zorder=3)
         if labels and not compact:
             # mouse names beside the CP points, pushed apart where points are
             # close, with a thin leader back to each point
@@ -777,19 +794,21 @@ if H4B:
         t_, p_ = ttest_rel(vals["CB"], vals["CP"]) if len(_pair) >= 2 else (np.nan, np.nan)
         if compact:
             ax.axhline(0, color="k", lw=0.6, ls=":")
+            _pad = max(0.6 * _x1, (PRESENT_JITTER + 0.12) if present else 0)
             ax.set(xticks=[0, _x1], xticklabels=list(_order),
-                   xlim=(-0.6 * _x1, 1.6 * _x1))
+                   xlim=(-_pad, _x1 + _pad))
             ax.set_box_aspect(1)                     # square inset
-            ax.tick_params(labelsize=7)
+            ax.tick_params(labelsize=PRESENT_FS - 2 if present else 7)
             if stars:
                 _top = np.nanmax(np.r_[vals["CB"], vals["CP"]])
                 _rng = _top - np.nanmin(np.r_[vals["CB"], vals["CP"]])
                 _yb = _top + 0.10 * _rng
                 ax.plot([0, 0, _x1, _x1], [_yb - 0.04 * _rng, _yb, _yb, _yb - 0.04 * _rng],
                         color="k", lw=0.8)
-                ax.text(_x1 / 2, _yb, _stars(p_), ha="center", va="bottom", fontsize=10)
+                ax.text(_x1 / 2, _yb, _stars(p_), ha="center", va="bottom",
+                        fontsize=PRESENT_FS + 3 if present else 10)
                 ax.set_ylim(top=_yb + 0.22 * _rng)
-                ax.set_title(name, fontsize=7.5)
+                ax.set_title(name, fontsize=PRESENT_FS - 1 if present else 7.5)
             else:
                 ax.set_title(f"{name}, {len(_pair)} mice" + chr(10)
                              + f"paired t({len(_pair)-1}) = {t_:.2f}, p = {p_:.3g}",
@@ -831,15 +850,17 @@ if H4B:
             inside the axes, each all-neuron value written next to its line), short
             title and axis labels, no definitions"""
             xs = LAG4B[_full] * 1000
+            _C = dict(CLR)
+            if present: _C["CB"] = PRESENT_CB_COLOR
             for reg in ("CP", "CB"):
                 if reg not in H4B: continue
                 for m, (mn, n) in H4B[reg]["mice"].items():
-                    ax.plot(xs, _norm(mn, "z")[_full], color=CLR[reg], lw=1.6, alpha=0.45)
+                    ax.plot(xs, _norm(mn, "z")[_full], color=_C[reg], lw=1.6, alpha=0.45)
                     v = _VAL[name](reg, m)
                     if np.isfinite(v):
-                        ax.axvline(v * 1000, color=CLR[reg], lw=1.2, alpha=0.45, ls="--")
+                        ax.axvline(v * 1000, color=_C[reg], lw=1.2, alpha=0.45, ls="--")
                 mn, _, n = H4B[reg]["all"]
-                ax.plot(xs, _norm(mn, "z")[_full], color=CLR[reg], lw=3.2,
+                ax.plot(xs, _norm(mn, "z")[_full], color=_C[reg], lw=3.2,
                         label=(f"{reg} (n={n} neurons, {len(H4B[reg]['mice'])} mice)"
                                if present else
                                f"{reg}: all neurons (n={n})" + chr(10)
@@ -847,19 +868,20 @@ if H4B:
             for reg in ("CP", "CB"):
                 v = _ALL[name](reg)
                 if np.isfinite(v):
-                    ax.axvline(v * 1000, color=CLR[reg], lw=2.6, ls="--",
+                    ax.axvline(v * 1000, color=_C[reg], lw=2.6, ls="--",
                                label=(f"{reg} {name}: {v*1000:+.0f} ms" if present else
                                       f"{reg} {name} (all neurons): {v*1000:+.0f} ms"))
                     if present:
-                        # the value next to its line, at the top: the earlier of
-                        # the two lines gets its label on its left, the later one
-                        # on its right, so they never overlap
+                        # the value next to its line, at the BOTTOM of the axes
+                        # (empty near lag 0, while the top holds the peak and
+                        # the region labels): the earlier of the two lines gets
+                        # its label on its left, the later one on its right
                         _other = _ALL[name]("CB" if reg == "CP" else "CP")
                         _left = np.isfinite(_other) and v < _other
-                        ax.text(v * 1000 + (-8 if _left else 8), 0.98,
+                        ax.text(v * 1000 + (-8 if _left else 8), 0.02,
                                 f"{v*1000:+.0f} ms", transform=ax.get_xaxis_transform(),
-                                ha="right" if _left else "left", va="top", fontsize=9,
-                                color=CLR[reg], fontweight="bold")
+                                ha="right" if _left else "left", va="bottom",
+                                fontsize=PRESENT_FS, color=_C[reg], fontweight="bold")
             ax.axvline(0, color="k", lw=0.8, ls=":"); ax.axhline(0, color="k", lw=0.5)
             ax.set(ylabel="MI per lag (z-scored)" if present else "h(lag), z-scored",
                    title=(name if present else
@@ -888,19 +910,24 @@ if H4B:
                 _tx, _ha = (0.02, "left") if _side == "right" else (0.98, "right")
                 for i_, reg in enumerate(("CP", "CB")):
                     if reg in H4B:
-                        ax.text(_tx, 0.97 - 0.07 * i_, f"{reg}  (n = {H4B[reg]['all'][2]} neurons)",
-                                transform=ax.transAxes, ha=_ha, va="top", fontsize=10,
-                                color=CLR[reg], fontweight="bold")
+                        ax.text(_tx, 0.97 - 0.08 * i_, f"{reg}  (n = {H4B[reg]['all'][2]} neurons)",
+                                transform=ax.transAxes, ha=_ha, va="top",
+                                fontsize=PRESENT_FS - 1, color=_C[reg], fontweight="bold")
             if xlabel:
                 ax.set_xlabel("lag = neural - kinematic (ms)" if present else
                               "lag = neural - kinematic (ms)     < 0: spikes BEFORE the movement")
             ax.title.set_fontsize(10)
+            if present:
+                ax.xaxis.label.set_fontsize(PRESENT_FS + 1)
+                ax.yaxis.label.set_fontsize(PRESENT_FS + 1)
+                ax.tick_params(labelsize=PRESENT_FS)
             ax.spines[["top", "right"]].set_visible(False)
             if not present:
                 ax.legend(fontsize=8, loc="center left", bbox_to_anchor=(1.02, 0.5),
                           frameon=False)
             _paired_box(ax.inset_axes(_INSET[_side]), TIMING4B[name],
-                        f"{name} (ms)", compact=True, stars=present)
+                        f"{name} (ms)", compact=True, stars=present,
+                        colors=_C, present=present)
 
         # the robust peak alone, with its inset -- the PRESENTATION figure: no
         # legend (region and neuron count inside the axes, each all-neuron value
