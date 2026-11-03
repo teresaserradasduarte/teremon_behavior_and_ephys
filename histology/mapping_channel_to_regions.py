@@ -694,23 +694,25 @@ def automate_all_sessions(ephys_root: str, hist_root: str) -> None:
                 # prepare output paths and skip if final regions file already exists
                 out_map = os.path.join(ks_dir, 'cluster_channel_map.txt')
                 out_regions = os.path.join(ks_dir, 'cluster_channel_region_map.txt')
-                if os.path.exists(out_regions):
-                    print(f'  Skipping {fo}: {out_regions} already exists')
-                    continue
-                try:
-                    print(f'  Computing cluster->channel mapping in {ks_dir} -> {out_map}')
-                    main(ks_dir, out_map)
-                except Exception as exc:
-                    print(f'  Error computing mapping for {fo}: {exc}')
-                    continue
+                if not os.path.exists(out_map):
+                    print(f'  Skipping {fo}: {out_map} already exists')
+                else: 
+                    try:
+                        print(f'  Computing cluster->channel mapping in {ks_dir} -> {out_map}')
+                        main(ks_dir, out_map)
+                    except Exception as exc:
+                        print(f'  Error computing mapping for {fo}: {exc}')
+                        continue
 
-                try:
-                    out_regions = os.path.join(ks_dir, 'cluster_channel_region_map.txt')
-                    print(f'  Mapping clusters to regions using {channel_locations_path} -> {out_regions}')
-                    create_cluster_region_file(out_map, channel_locations_path, out_regions)
-                except Exception as exc:
-                    print(f'  Error mapping clusters->regions for {fo}: {exc}')
-                    continue
+                if not os.path.exists(out_regions):
+                    print(f'  Skipping {fo}: {out_regions} already exists')
+                else: 
+                    try:
+                        print(f'  Mapping clusters to regions using {channel_locations_path} -> {out_regions}')
+                        create_cluster_region_file(out_map, channel_locations_path, out_regions)
+                    except Exception as exc:
+                        print(f'  Error mapping clusters->regions for {fo}: {exc}')
+                        continue
 
                 print(f'  Completed session {fo}: outputs in {ks_dir}')
 
@@ -791,10 +793,70 @@ def summarize_cell_counts(ephys_root: str, unknown_label: str = 'Unknown', outpu
                     except Exception:
                         pass
 
+
                 if not extragood_ids:
                     # No extragood list found; skip this imec from counts
                     print(f"  No extragood list in {ks_dir}; skipping imec for summaries")
                     continue
+
+
+                cluster_group_path = os.path.join(ks_dir, 'cluster_group.tsv')
+                if os.path.exists(cluster_group_path):
+                    noise_ids = set()
+                    present_ids = set()
+                    try:
+                        with open(cluster_group_path, 'r', encoding='utf8') as gfh:
+                            sample = gfh.read(4096)
+                            gfh.seek(0)
+                            try:
+                                sniffer = csv.Sniffer()
+                                dialect = sniffer.sniff(sample) if sample else csv.excel_tab
+                            except Exception:
+                                dialect = csv.excel_tab
+                            reader = csv.DictReader(gfh, dialect=dialect)
+                            if reader.fieldnames:
+                                headers = [h.strip() for h in reader.fieldnames]
+                                lower = [h.lower() for h in headers]
+                                cid_key = headers[lower.index('cluster_id')] if 'cluster_id' in lower else (
+                                    headers[lower.index('cluster')] if 'cluster' in lower else None
+                                )
+                                # Support common alternatives (e.g., KSLabel)
+                                group_key = headers[lower.index('group')] if 'group' in lower else (
+                                    headers[lower.index('kslabel')] if 'kslabel' in lower else None
+                                )
+                                if cid_key:
+                                    for row in reader:
+                                        # Track all IDs present in cluster_group
+                                        try:
+                                            cid_val = int(str(row.get(cid_key)).strip())
+                                        except Exception:
+                                            continue
+                                        present_ids.add(cid_val)
+                                        # Track IDs labeled as noise
+                                        if group_key:
+                                            try:
+                                                grp = str(row.get(group_key, '')).strip().lower()
+                                                if grp == 'noise':
+                                                    noise_ids.add(cid_val)
+                                            except Exception:
+                                                pass
+                    except Exception:
+                        pass
+
+                    # Apply combined filter: keep IDs that are present and not labeled as noise
+                    if present_ids or noise_ids:
+                        before = len(extragood_ids)
+                        if present_ids:
+                            extragood_ids = {cid for cid in extragood_ids if cid in present_ids and cid not in noise_ids}
+                            removed = before - len(extragood_ids)
+                            print(f"Filtered extragood by cluster_group.tsv: {before} -> {len(extragood_ids)} (removed {removed} by noise or not present)")
+                        else:
+                            # Fallback: only noise filtering if present set couldn't be built
+                            extragood_ids = {cid for cid in extragood_ids if cid not in noise_ids}
+                            removed = before - len(extragood_ids)
+                            print(f"Filtered extragood by cluster_group.tsv: {before} -> {len(extragood_ids)} (removed {removed} 'noise')")
+                else:
+                    print("cluster_group.tsv not found; no noise filtering applied.")
 
                 # counts for this imec only
                 imec_counts = Counter()
@@ -893,4 +955,256 @@ automate_all_sessions(ephys_root=r'D:\Learning Lab Dropbox\Learning Lab Team Fol
 summarize_cell_counts(ephys_root=r'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup')
                         
 
+# %%
+subpaths_CB = [
+    #% Côte d'Or
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\1_CoteDor\02082023_CoteDorS1CB_g0\02082023_CoteDorS1CB_g0_imec0\catGT\kilosort4',
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\1_CoteDor\04082023_CoteDor_StrCer_S4_g0\04082023_CoteDor_StrCer_S4_g0_imec0\ibl_sorter_results',
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\1_CoteDor\04082023_CoteDor_Cer_S5_g0\04082023_CoteDor_Cer_S5_g0_imec0\ibl_sorter_results_driftAdapt40',
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\1_CoteDor\08082023_CoteDor_StrCer_S6_g0\08082023_CoteDor_StrCer_S6_g0_imec0\catGT\kilosort4',
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\1_CoteDor\08082023_CoteDor_StrCer_S7_g0\08082023_CoteDor_StrCer_S7_g0_imec0\ibl_sorter_results',
+    #% Lindt
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\2_Lindt\23082023_Lindt_StrCer_S1_true_g0\23082023_Lindt_StrCer_S1_true_g0_imec1\catGT\kilosort4',
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\2_Lindt\23082023_Lindt_StrCer_S2_g0\23082023_Lindt_StrCer_S2_g0_imec1\catGT\kilosort4',
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\2_Lindt\25082023_Lindt_StrCer_S3_g0\25082023_Lindt_StrCer_S3_g0_imec1\ibl_sorter_results',
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\2_Lindt\26082023_Lindt_StrCer_S4_g0\26082023_Lindt_StrCer_S4_g0_imec1\catGT\kilosort4',
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\2_Lindt\27082023_Lindt_StrCer_S5_g0\27082023_Lindt_StrCer_S5_g0_imec1\ibl_sorter_results',
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\2_Lindt\28082023_Lindt_StrCer_S6_g0\28082023_Lindt_StrCer_S6_g0_imec1\ibl_sorter_results',
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\2_Lindt\29082023_Lindt_StrCer_S7_g0\29082023_Lindt_StrCer_S7_g0_imec1\ibl_sorter_results_driftAdapt20',
+    #% Toblerone
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\3_Toblerone\23082023_Toblerone_StrCer_S1_g0\23082023_Toblerone_StrCer_S1_g0_imec1\ibl_sorter_results',
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\3_Toblerone\24082023_Toblerone_StrCer_S2_g0\24082023_Toblerone_StrCer_S2_g0_imec1\ibl_sorter_results',
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\3_Toblerone\25082023_Toblerone_StrCer_S3_g0\25082023_Toblerone_StrCer_S3_g0_imec1\catGT\kilosort4',
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\3_Toblerone\26082023_Toblerone_StrCer_S4_g0\26082023_Toblerone_StrCer_S4_g0_imec1\ibl_sorter_results',
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\3_Toblerone\27082023_Toblerone_StrCer_S5_g0\27082023_Toblerone_StrCer_S5_g0_imec1\ibl_sorter_results',
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\3_Toblerone\28082023_Toblerone_StrCer_S6_g0\28082023_Toblerone_StrCer_S6_g0_imec1\catGT\kilosort4',
+    #% Milka
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\4_Milka\15082023_Milka_StrCer_S1_g0\15082023_Milka_StrCer_S1_g0_imec0\ibl_sorter_results',
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\4_Milka\18082023_Milka_StrCer_S4_g0\18082023_Milka_StrCer_S4_g0_imec0\catGT\kilosort4',
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\4_Milka\19082023_Milka_StrCer_S5_g0\19082023_Milka_StrCer_S5_g0_imec0\ibl_sorter_results',
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\4_Milka\20082023_Milka_StrCer_S6_g0\20082023_Milka_StrCer_S6_g0_imec0\ibl_sorter_results',
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\4_Milka\21082023_Milka_StrCer_S7_g0\21082023_Milka_StrCer_S7_g0_imec0\ibl_sorter_results',
+    #% Ferrero Rocher
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\5_FerreroRocher\15082023_Ferrero_StrCer_S1_g0\15082023_Ferrero_StrCer_S1_g0_imec0\catGT\kilosort4',
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\5_FerreroRocher\18082023_Ferrero_StrCer_S4_g0\18082023_Ferrero_StrCer_S4_g0_imec0\catGT\kilosort4',
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\5_FerreroRocher\19082023_Ferrero_StrCer_S5_g0\19082023_Ferrero_StrCer_S5_g0_imec0\ibl_sorter_results',
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\5_FerreroRocher\20082023_Ferrero_StrCer_S6_g0\20082023_Ferrero_StrCer_S6_g0_imec0\catGT\kilosort4']
+
+subpaths_BG = [
+    #% Côte d'Or
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\1_CoteDor\02082023_CoteDorS2Str_g0\02082023_CoteDorS2Str_g0_imec0\ibl_sorter_results',
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\1_CoteDor\04082023_CoteDor_Str_S3_g0\04082023_CoteDor_Str_S3_g0_imec0\ibl_sorter_results',
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\1_CoteDor\04082023_CoteDor_StrCer_S4_g0\04082023_CoteDor_StrCer_S4_g0_imec1\ibl_sorter_results_driftAdapt2',
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\1_CoteDor\08082023_CoteDor_StrCer_S6_g0\08082023_CoteDor_StrCer_S6_g0_imec1\catGT\kilosort4',
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\1_CoteDor\08082023_CoteDor_StrCer_S7_g0\08082023_CoteDor_StrCer_S7_g0_imec1\ibl_sorter_results',
+    #% Lindt
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\2_Lindt\23082023_Lindt_StrCer_S1_true_g0\23082023_Lindt_StrCer_S1_true_g0_imec0\catGT\kilosort4',
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\2_Lindt\23082023_Lindt_StrCer_S2_g0\23082023_Lindt_StrCer_S2_g0_imec0\catGT\kilosort4',
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\2_Lindt\25082023_Lindt_StrCer_S3_g0\25082023_Lindt_StrCer_S3_g0_imec0\ibl_sorter_results',
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\2_Lindt\26082023_Lindt_StrCer_S4_g0\26082023_Lindt_StrCer_S4_g0_imec0\catGT\kilosort4',
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\2_Lindt\27082023_Lindt_StrCer_S5_g0\27082023_Lindt_StrCer_S5_g0_imec0\ibl_sorter_results',
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\2_Lindt\28082023_Lindt_StrCer_S6_g0\28082023_Lindt_StrCer_S6_g0_imec0\ibl_sorter_results',
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\2_Lindt\29082023_Lindt_StrCer_S7_g0\29082023_Lindt_StrCer_S7_g0_imec0\ibl_sorter_results',
+    #% Toblerone
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\3_Toblerone\23082023_Toblerone_StrCer_S1_g0\23082023_Toblerone_StrCer_S1_g0_imec0\ibl_sorter_results',
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\3_Toblerone\24082023_Toblerone_StrCer_S2_g0\24082023_Toblerone_StrCer_S2_g0_imec0\ibl_sorter_results',
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\3_Toblerone\25082023_Toblerone_StrCer_S3_g0\25082023_Toblerone_StrCer_S3_g0_imec0\catGT\kilosort4',
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\3_Toblerone\26082023_Toblerone_StrCer_S4_g0\26082023_Toblerone_StrCer_S4_g0_imec0\catGT\kilosort4',
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\3_Toblerone\27082023_Toblerone_StrCer_S5_g0\27082023_Toblerone_StrCer_S5_g0_imec0\ibl_sorter_results',
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\3_Toblerone\28082023_Toblerone_StrCer_S6_g0\28082023_Toblerone_StrCer_S6_g0_imec0\catGT\kilosort4',
+    #% Milka
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\4_Milka\15082023_Milka_StrCer_S1_g0\15082023_Milka_StrCer_S1_g0_imec1\ibl_sorter_results',
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\4_Milka\18082023_Milka_StrCer_S4_g0\18082023_Milka_StrCer_S4_g0_imec1\catGT\kilosort4',
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\4_Milka\19082023_Milka_StrCer_S5_g0\19082023_Milka_StrCer_S5_g0_imec1\ibl_sorter_results',
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\4_Milka\20082023_Milka_StrCer_S6_g0\20082023_Milka_StrCer_S6_g0_imec1\ibl_sorter_results',
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\4_Milka\21082023_Milka_StrCer_S7_g0\21082023_Milka_StrCer_S7_g0_imec1\ibl_sorter_results',
+    #% Ferrero Rocher
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\5_FerreroRocher\15082023_Ferrero_StrCer_S1_g0\15082023_Ferrero_StrCer_S1_g0_imec1\catGT\kilosort4',
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\5_FerreroRocher\18082023_Ferrero_StrCer_S4_g0\18082023_Ferrero_StrCer_S4_g0_imec1\catGT\kilosort4',
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\5_FerreroRocher\19082023_Ferrero_StrCer_S5_g0\19082023_Ferrero_StrCer_S5_g0_imec1\ibl_sorter_results',
+    'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\5_FerreroRocher\20082023_Ferrero_StrCer_S6_g0\20082023_Ferrero_StrCer_S6_g0_imec1\catGT\kilosort4']
+
+# %%
+def check_if_path_is_correct(ephys_root: str, subpaths_CB : list, subpaths_BG :list) -> None:
+    """Walk ephys_root per-animal and per-session, compute cluster->channel and cluster->region files.
+
+    For each session folder under each animal, finds the first subdirectory that contains
+    `neurons_session.mat` and uses that as `ks_dir`. Then finds the corresponding
+    histology folder under `hist_root` with the same session name and uses
+    `channel_locations_simplified.tsv` (preferred) or `channel_locations.json`.
+    Writes `cluster_channel_map.txt` and `cluster_channel_region_map.txt` into the `ks_dir`.
+    """
+    if not os.path.isdir(ephys_root):
+        raise ValueError(f'ephys_root not found: {ephys_root}')
+
+    animals = [d for d in sorted(os.listdir(ephys_root)) if os.path.isdir(os.path.join(ephys_root, d))]
+    print(f'Found {len(animals)} animals under {ephys_root}')
+    for a in animals:
+        a_path = os.path.join(ephys_root, a)
+        sessions = [s for s in sorted(os.listdir(a_path)) if os.path.isdir(os.path.join(a_path, s))]
+        print(f'Animal {a}: {len(sessions)} sessions')
+        print(sessions)
+        for s in sessions:
+            session_path = os.path.join(a_path, s)
+            for fo in sorted(os.listdir(session_path)):
+                imec_session_path = os.path.join(session_path, fo)
+                if not os.path.isdir(imec_session_path):
+                    continue
+                print(f' Processing session {s}...')
+                # find ks_dir by locating neurons_session.mat under session_path
+                ks_dir = None
+
+                for root, dirs, files in os.walk(imec_session_path):
+                    if 'neurons_session.mat' in files:
+                        ks_dir = root
+                        break
+                if ks_dir is None:
+                    print(f'  Skipped {s}: neurons_session.mat not found under {imec_session_path}')
+                if ks_dir in subpaths_CB or ks_dir in subpaths_BG:
+                    print(f'  Skipped {ks_dir}: path not in the provided subpaths lists')
+                    continue
+
+
+# %%
+check_if_path_is_correct(ephys_root=r'D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup',
+                    subpaths_CB=subpaths_CB,
+                    subpaths_BG=subpaths_BG)
+# %%
+import pandas as pd
+session_path = r"D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_data\20230801_ChocolateGroup\5_FerreroRocher\15082023_Ferrero_StrCer_S1_g0\15082023_Ferrero_StrCer_S1_g0_imec1\catGT\kilosort4"
+cluster_extragood = pd.read_csv(rf"{session_path}\cluster_Extragood.tsv", sep="\t")
+count_contains_y = (
+    cluster_extragood["Extragood"]
+    .astype(str)
+    .str.lower()
+    .str.contains("y", na=False)
+    .sum()
+)
+print("Contains 'y' count:", count_contains_y)
+
+
+
+df_map =  pd.read_csv(rf"{session_path}\cluster_channel_region_map.txt", sep="\t")
+col = cluster_extragood["Extragood"].astype(str).str.strip().str.lower()
+
+mask = col.eq("y")  # exact match for 'y'
+
+# Filter clusters with 'y'
+y_clusters = cluster_extragood.loc[mask, ["cluster_id"]]
+
+# Join to get brain_region
+result = y_clusters.merge(
+    df_map[["cluster_id", "brain_region"]],
+    on="cluster_id",
+    how="left"
+)
+# Normalize cluster IDs to integers (fallback to strings if needed)
+
+
+print("\nCounts per region:\n", result["brain_region"].value_counts(dropna=False))
+# %%
+import h5py
+import numpy as np
+from scipy.io import loadmat
+session_path_mat = r"D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\ephys_and_behavior\mat_files\20230801_ChocolateGroup\5_FerreroRocher\R1"
+mat_path = rf"{session_path_mat}\eg_neurons_BG.mat"
+
+
+
+f = h5py.File(mat_path, "r")
+
+list(f['eg_neurons'].keys())
+data = f['eg_neurons']["phyID"][:][0]
+print(f[data[0]])
+
+
+
+refs = np.array(data).ravel()  # flatten references
+
+def deref_value(h5file, ref):
+    # Handle both HDF5 references and any non-ref values
+    try:
+        obj = h5file[ref] if isinstance(ref, (h5py.Reference, h5py.h5r.Reference)) else ref
+    except Exception:
+        # If not a valid reference, return as-is (normalized below)
+        obj = ref
+
+    # If it's an object (Dataset/Group), read contents
+    if isinstance(obj, h5py.Dataset):
+        raw = obj[()]
+    elif isinstance(obj, h5py.Group):
+        # Try first dataset inside the group
+        dset = next((v for v in obj.values() if isinstance(v, h5py.Dataset)), None)
+        if dset is None:
+            # If no datasets, return the group name as a fallback
+            return obj.name
+        raw = dset[()]
+    else:
+        # Already a plain Python value
+        raw = obj
+
+    # Normalize to a single scalar (prefer numeric)
+    arr = np.atleast_1d(raw).ravel()
+    # Decode bytes -> str if needed
+    arr = [x.decode() if isinstance(x, (bytes, bytearray)) else x for x in arr]
+    s = pd.Series(arr)
+    num = pd.to_numeric(s, errors="coerce").dropna()
+    return int(num.iloc[0]) if not num.empty else str(s.iloc[0]).strip()
+
+phy_ids = [deref_value(f, r) for r in refs]
+# 3) Coerce phy_raw to flat list and normalize types
+phy_arr = np.atleast_1d(phy_ids).ravel()
+phy_series = pd.Series(list(phy_ids))
+# Bytes→str if needed
+phy_series = phy_series.apply(lambda x: x.decode() if isinstance(x, (bytes, bytearray)) else x)
+phy_num = pd.to_numeric(phy_series, errors="coerce").dropna().astype(int)
+phy_str = phy_series.astype(str).str.strip()
+
+#%%
+# Build numeric sets (robust to strings/mixed types)
+cluster_ids_num = pd.to_numeric(result["cluster_id"], errors="coerce").dropna().astype(int)
+phy_ids_num = pd.to_numeric(pd.Series(phy_ids), errors="coerce").dropna().astype(int)
+
+inter_num = sorted(set(cluster_ids_num.tolist()) & set(phy_ids_num.tolist()))
+print(f"Numeric intersection count: {len(inter_num)}")
+print("Numeric IDs:", inter_num)
+
+# String fallback (in case some IDs are non-numeric)
+cluster_ids_str = result["cluster_id"].astype(str).str.strip()
+phy_ids_str = pd.Series(phy_ids).astype(str).str.strip()
+
+inter_str = sorted(set(cluster_ids_str.tolist()) & set(phy_ids_str.tolist()))
+print(f"String intersection count: {len(inter_str)}")
+print("String IDs:", inter_str)
+# %%
+# Assumes f = h5py.File(mat_path, "r") and data = f['eg_neurons']["phyID"][:][0]
+# Numeric-safe sets
+cluster_ids_num = pd.to_numeric(result["cluster_id"], errors="coerce").dropna().astype(int)
+phy_ids_num = pd.to_numeric(pd.Series(phy_ids), errors="coerce").dropna().astype(int)
+
+cluster_set_num = set(cluster_ids_num.tolist())
+phy_set_num = set(phy_ids_num.tolist())
+
+inter_num = sorted(cluster_set_num & phy_set_num)
+only_clusters_num = sorted(cluster_set_num - phy_set_num)
+
+print(f"Numeric intersection count: {len(inter_num)}")
+print("Numeric intersection IDs:", inter_num)
+print(f"Numeric-only (in clusters, not in phy_ids) count: {len(only_clusters_num)}")
+print("Numeric-only IDs:", only_clusters_num)
+
+# String fallback (covers non-numeric IDs)
+cluster_ids_str = result["cluster_id"].astype(str).str.strip()
+phy_ids_str = pd.Series(phy_ids).astype(str).str.strip()
+
+cluster_set_str = set(cluster_ids_str.tolist())
+phy_set_str = set(phy_ids_str.tolist())
+
+inter_str = sorted(cluster_set_str & phy_set_str)
+only_clusters_str = sorted(cluster_set_str - phy_set_str)
+
+print(f"String intersection count: {len(inter_str)}")
+print("String intersection IDs:", inter_str)
+print(f"String-only (in clusters, not in phy_ids) count: {len(only_clusters_str)}")
+print("String-only IDs:", only_clusters_str)
 # %%

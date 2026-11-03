@@ -223,8 +223,10 @@ def process_channel_locations(input_path: str, tsv_path: Optional[str] = None, p
 
 
 # %% Run the session one by one
-path = r"D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\histology\20230801_ChocolateGroup\5_FerreroRocher\LineFit\CB\outputForIBL\20082023_Ferrero_StrCer_S6_g0_imec0"
+path = r"D:\Learning Lab Dropbox\Learning Lab Team Folder\Patlab protocols\Data\TD\histology\20230801_ChocolateGroup\3_Toblerone\LineFit\CB\outputForIBL\25082023_Toblerone_StrCer_S3_g0_imec1"
 path_channel_locations = path + r"\channel_locations.json"
 data = load_channel_locations(path_channel_locations)
 channels = get_channels_sorted(data)
 process_channel_locations(path_channel_locations, interactive=True, print_limit=0)
+
+# %%
