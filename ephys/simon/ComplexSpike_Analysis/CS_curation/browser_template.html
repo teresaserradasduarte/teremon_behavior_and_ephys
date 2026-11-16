@@ -1,0 +1,1719 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CS curation browser</title>
+<!-- Template for step0_explore_session.py (section 8b). step0 copies it to <OUT_DIR>/browser.html and writes the
+     data to <OUT_DIR>/browser_data.js. Edit this file and copy it over browser.html to change the page. -->
+<style>
+:root {
+  --bg: #f7f7f8; --panel: #ffffff; --ink: #1d1d22; --muted: #6b6b76; --line: #e2e2e7;
+  --cb: #9a7bc1; --cb-soft: #ede6f6; --tier2: #8c8c8c; --blue: #3380cc;
+  --plus: #9fd49f; --minus: #eea0a0; --zero: #ebebeb;
+  --shade: #e4e4e4; --shade2: #f1f1f1;
+}
+* { box-sizing: border-box; }
+body { margin: 0; font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink); background: var(--bg); }
+header { display: flex; align-items: center; gap: 16px; padding: 8px 16px; background: var(--panel); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 5; flex-wrap: wrap; }
+header h1 { font-size: 15px; margin: 0; }
+header .meta { color: var(--muted); font-size: 12px; }
+.tabs { display: flex; gap: 4px; margin-left: auto; }
+.tabs button, .ctl button { border: 1px solid var(--line); background: var(--panel); padding: 5px 12px; border-radius: 6px; cursor: pointer; font: inherit; }
+.tabs button.on { background: var(--cb); color: white; border-color: var(--cb); }
+#app { display: grid; grid-template-columns: 250px 1fr; min-height: calc(100vh - 46px); }
+aside { border-right: 1px solid var(--line); background: var(--panel); overflow-y: auto; max-height: calc(100vh - 46px); position: sticky; top: 46px; }
+aside .filters { padding: 8px; border-bottom: 1px solid var(--line); display: flex; gap: 6px; flex-wrap: wrap; }
+aside select { font: inherit; }
+.cs-row { padding: 5px 10px; border-bottom: 1px solid var(--line); cursor: pointer; display: grid; grid-template-columns: 44px 1fr; gap: 2px 6px; }
+.cs-row:hover { background: var(--shade2); }
+.cs-row.on { background: var(--cb-soft); border-left: 3px solid var(--cb); }
+.cs-row .id { font-weight: 600; }
+.cs-row .sub { color: var(--muted); font-size: 11px; grid-column: 2; }
+.badge { display: inline-block; padding: 0 5px; border-radius: 8px; font-size: 10.5px; margin-right: 3px; background: var(--zero); }
+.badge.t1 { background: var(--cb); color: white; } .badge.t2 { background: var(--tier2); color: white; }
+tr.weakrow td { color: #888; }
+.badge.fam { background: #f3d9a8; } .badge.none { background: #f6dede; }
+main { padding: 12px 16px 40px; min-width: 0; }
+.grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; min-width: 0; }
+.card h3 { margin: 0 0 4px; font-size: 12.5px; font-weight: 600; padding-right: 22px; }
+.card { position: relative; }
+.infoi { position: absolute; top: 6px; right: 8px; width: 16px; height: 16px; border-radius: 50%; border: 1px solid #9a9aa6;
+        color: #6b6b76; font: italic 700 11px/14px Georgia, serif; text-align: center; cursor: help; background: #fff; z-index: 3; user-select: none; }
+.infoi:hover, .infoi:focus { background: var(--cb); border-color: var(--cb); color: #fff; outline: none; }
+.infoi .pop { display: none; position: absolute; right: -2px; top: 100%; width: min(480px, 78vw); max-height: 65vh; overflow: auto;
+             background: #fff; color: var(--ink); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 6px 22px rgba(0,0,0,.18);
+             padding: 10px 12px; font: 12px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; font-style: normal; text-align: left;
+             white-space: normal; cursor: auto; z-index: 60; }
+.infoi:hover .pop, .infoi:focus .pop, .infoi:focus-within .pop { display: block; }
+.infoi .pop p { margin: 0 0 6px; } .infoi .pop p:last-child { margin: 0; }
+.infoi.inline { position: relative; top: auto; right: auto; display: inline-block; margin-left: 6px; vertical-align: 1px; }
+.infoi.inline .pop { left: 0; right: auto; top: 100%; }
+.card .note { color: var(--muted); font-size: 11.5px; }
+.wide { grid-column: 1 / -1; }
+.span2 { grid-column: span 2; }
+.ctl { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 0 0 10px; }
+.ctl label { color: var(--muted); }
+.ctl select { font: inherit; }
+table { border-collapse: collapse; font-size: 11.5px; }
+th, td { padding: 3px 6px; border: 1px solid var(--line); text-align: center; white-space: nowrap; }
+th { background: var(--shade2); font-weight: 600; position: sticky; top: 0; }
+td.plus { background: var(--plus); } td.minus { background: var(--minus); } td.zero { background: var(--zero); }
+td.info.plus { background: #d6ecd6; } td.info.minus { background: #f6d6d6; }
+tr.click { cursor: pointer; } tr.click:hover td { outline: 1px solid var(--cb); }
+tr.sel td { box-shadow: inset 0 0 0 2px var(--cb); }
+td.selcol, th.selcol { box-shadow: inset 2px 0 0 var(--ink), inset -2px 0 0 var(--ink); }
+.ccgs { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
+.ccg-cell { cursor: pointer; border: 1px solid var(--line); border-radius: 6px; padding: 2px 4px; background: var(--panel); }
+.ccg-cell.cand .t { color: var(--cb); font-weight: 600; }
+.ccg-cell.sel { box-shadow: 0 0 0 2px var(--cb); }
+.ccg-cell .t { font-size: 11px; }
+pre.card-text { margin: 0; font: 11.5px/1.45 ui-monospace, Consolas, monospace; white-space: pre-wrap; }
+svg text { font: 10px system-ui, sans-serif; fill: var(--ink); }
+svg .ax { stroke: #444; stroke-width: 1; fill: none; }
+svg .tick { stroke: #444; stroke-width: 1; }
+svg .muted { fill: var(--muted); }
+.table-wrap { overflow: auto; max-height: 520px; }
+.hint { color: var(--muted); font-size: 11.5px; margin: 2px 0 8px; }
+.badge.raw { background: #d8e8f6; } .badge.warn { background: #b3261e; color: white; }
+img.fig { width: 100%; height: auto; border-radius: 4px; display: block; }
+.figlinks a { margin-right: 10px; font-size: 11.5px; color: var(--blue); }
+.kpi { display: flex; gap: 18px; flex-wrap: wrap; margin: 2px 0 4px; }
+.kpi div { display: flex; flex-direction: column; } .kpi b { font-size: 17px; font-weight: 600; } .kpi span { color: var(--muted); font-size: 11px; }
+details.card > summary { cursor: pointer; font-weight: 600; font-size: 12.5px; }
+kbd { border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; font-size: 11px; background: var(--shade2); }
+</style>
+</head>
+<body>
+<header>
+  <h1>CS curation browser</h1>
+  <span class="meta" id="meta"></span>
+  <div class="tabs" id="tabs"></div>
+</header>
+<div id="app">
+  <aside>
+    <div class="filters">
+      <select id="f-show">
+        <option value="all">all CS</option><option value="matched">with SS partner</option>
+        <option value="unmatched">no SS partner</option><option value="family">in a duplicate family</option>
+        <option value="dup">with any CS–CS pair</option>
+      </select>
+      <select id="f-sort"><option value="y">sort: depth</option><option value="id">sort: phyID</option></select>
+    </div>
+    <div id="cslist"></div>
+  </aside>
+  <main id="main"></main>
+</div>
+<script src="browser_data.js"></script>
+<!-- optional raw-data layer (raw_waveforms_session.py, one session at a time); absent for most sessions -->
+<script src="../raw_waveforms/raw_data.js" onerror="window.CS_RAW = null"></script>
+<!-- optional: single raw events of CS–CS pairs (raw_dup_events.py) -->
+<script src="../raw_waveforms/raw_dup_events.js" onerror="window.CS_RAW_DUPEV = null"></script>
+<!-- optional: are two SS partners of one CS the same cell? (ss_same_cell_check.py) -->
+<script src="../ss_same_cell/ss_same_cell.js" onerror="window.CS_SSPAIR = null"></script>
+<!-- optional: pause figure + ephaptic check from spike times (pause_figure_data.py) -->
+<script src="../pause_figure/pause_figure.js" onerror="window.CS_PAUSEFIG = null"></script>
+<!-- optional: raw traces around CS events, overlaid (raw_cs_overlay.py; only sessions with a raw file) -->
+<script src="../raw_overlay/raw_overlay.js" onerror="window.CS_RAWOVERLAY = null"></script>
+<script>
+"use strict";
+const D = window.CS_DATA;
+if (!D) document.getElementById("main").innerHTML =
+  "<p>browser_data.js not found next to this file. Re-run step0 (section 8b).</p>";
+const P = D.params;
+const NS = "http://www.w3.org/2000/svg";
+const COL = { cb: "#9a7bc1", t2: "#8c8c8c", blue: "#3380cc", ink: "#1d1d22", grey: "#9a9a9a",
+              shade: "#e4e4e4", shade2: "#f1f1f1", dot: "rgba(40,40,40,0.25)" };
+const EV_LINES = ["coinc", "lag_sd", "union", "ss_shared", "ss_cond", "footprint", "covar"];
+const EV_LABELS = { coinc: "coincidence", lag_sd: "lag jitter", union: "union ISIs", ss_shared: "shared SS",
+                    ss_cond: "co-silencing", footprint: "footprint", covar: "amp/depth covar" };
+const EV_HELP = {
+  coinc: `fraction of the smaller unit's spikes within ±${P.COINC_DELTA * 1e3} ms of the peak lag: ≥ ${P.EV_COINC[0]} → +1, < ${P.EV_COINC[1]} → −1`,
+  lag_sd: `robust SD of the coincident lag: ≤ ${P.EV_LAG_SD[0] * 1e3} ms → +1, ≥ ${P.EV_LAG_SD[1] * 1e3} ms → −1 (votes only if coinc ≥ ${P.EV_COINC[1]})`,
+  union: `new ${P.UNION_ISI_RANGE[0] * 1e3}–${P.UNION_ISI_RANGE[1] * 1e3} ms ISIs after merging / expected for independent trains: ≤ ${P.EV_UNION_NEW[0]} → +1, ≥ ${P.EV_UNION_NEW[1]} → −1`,
+  ss_shared: "both units pause the same SS candidate → +1; both have partners but none shared → −1",
+  ss_cond: `pause of one unit's own SS partner after the OTHER unit's non-coincident spikes: ≤ ${P.EV_COND_PR[0]} → +1, ≥ ${P.EV_COND_PR[1]} → −1`,
+  footprint: `template footprint cosine (≥ ${P.FOOTPRINT_MIN_OVERLAP} shared channels): ≥ ${P.EV_FOOTPRINT[0]} → +1, ≤ ${P.EV_FOOTPRINT[1]} → −1`,
+  covar: `|detrended amplitude corr| or depth corr of coincident spikes ≥ ${P.EV_COVAR} → +1 (never −1)`,
+};
+// candidate criteria (all four make "candidate") and info-only columns, mirroring step0
+const GRID = [
+  { h: `pause ${+(P.PAUSE_WIN[0] * 1e3).toFixed(1)}–${+(P.PAUSE_WIN[1] * 1e3).toFixed(1)}`, k: "pause_ratio", ok: v => v < P.CAND_PAUSE_RATIO_MAX, crit: true, nd: 2 },
+  { h: "asym", k: "asym", ok: v => v > P.CAND_ASYM_MIN, crit: true, nd: 2 },
+  { h: "jitter p", k: "jitter_p", ok: v => v < P.CAND_JITTER_P_MAX, crit: true, nd: 3 },
+  { h: "no dip", k: "collision_dip", ok: v => !v, crit: true },
+  { h: "blocks max", k: "block_pr_max", ok: v => v < P.CAND_PAUSE_RATIO_MAX, crit: false, nd: 2 },
+  { h: "dur50 ms", k: "pause_dur50_ms", ok: v => v >= 3, crit: false, nd: 0 },
+  { h: "zero peak", k: "zero_peak_ratio", ok: v => v < 2, crit: false, nd: 2 },
+  { h: "Lussac", k: "lussac_pass", ok: v => !!v, crit: false },
+  // CS-spike sharing: flag only (never part of "candidate"); ✗ = this "SS" carries > CS_SHARE_FLAG of the CS spikes
+  { h: "CS shared", k: "cs_share_excess", ok: v => !(v > P.CS_SHARE_FLAG), crit: false, nd: 2 },
+  // v6: SS spikes inside the CS event (−0.5…+4 ms) beyond chance; ✗ = this "SS" carries pieces of the CS event (flag only)
+  ...(P.CS_EVENT_FLAG !== undefined ? [
+    { h: "CS event", k: "cs_event_excess", ok: v => !(v > P.CS_EVENT_FLAG), crit: false, nd: 2 },
+    { h: "pr 0–8 (v5)", k: "pause_ratio_0_8", ok: v => v < P.CAND_PAUSE_RATIO_MAX, crit: false, nd: 2 }] : []),
+  // v8 (information only; candidate_lit = lat p, Cliff, refr ratio, no dip — never changes "candidate")
+  ...(P.LIT_LAT_P_MAX !== undefined ? [
+    { h: "lit ★", k: "candidate_lit", ok: v => !!v, crit: false },
+    { h: "lat p", k: "lat_p", ok: v => v < P.LIT_LAT_P_MAX, crit: false, nd: 3 },
+    { h: "Cliff", k: "lat_cliff", ok: v => v >= P.LIT_CLIFF_MIN, crit: false, nd: 2 },
+    { h: "refr", k: "refr_ratio", ok: v => v < P.LIT_REFR_RATIO_MAX, crit: false, nd: 2 },
+    { h: "dur/ISI", k: "pause_isi_units", ok: v => v > P.LIT_DUR_ISI_K, crit: false, nd: 2 },
+    { h: "Lussac p1", k: "lussac_paper_v1_pass", ok: v => !!v, crit: false },
+    { h: "Lussac main", k: "lussac_code_main_pass", ok: v => !!v, crit: false }] : []),
+];
+const V6 = P.CS_EVENT_FLAG !== undefined;
+const V8 = D.v8 || null;
+const DECOMP = D.decomp || [], LOWFR = D.lowfr || [];
+DECOMP.forEach(r => { if (r.strong === undefined) r.strong = r.excess > P.CS_EVENT_FLAG || r.mostly_cs_pieces; });
+const decompOf = cs => DECOMP.filter(r => r.cs === cs);
+const curRank1 = cs => pairsOfCs(cs).find(p => p.rank === 1)?.ss;
+const FUNNEL = [
+  [`pause ratio < ${P.CAND_PAUSE_RATIO_MAX}`, p => p.pause_ratio < P.CAND_PAUSE_RATIO_MAX],
+  [`asym > ${P.CAND_ASYM_MIN}`, p => p.asym > P.CAND_ASYM_MIN],
+  [`jitter p < ${P.CAND_JITTER_P_MAX}`, p => p.jitter_p < P.CAND_JITTER_P_MAX],
+  ["no collision dip", p => !p.collision_dip],
+];
+
+// ---------- state (mirrored in the URL hash, so a view can be reloaded or bookmarked) ----------
+const S = { cs: D.cs_ids[0], tab: "overview", ss: null, pair: null, rank: "rank", topn: 8, bin: 1, win: 50,
+            tcand: true, tthis: true, weak: false, sortk: null, sortasc: true, osum: false, rawk: null, rawss: null, rawdup: null, dupset: "coincident", sspair: null, ctrl: null };
+function readHash() {
+  const h = new URLSearchParams(location.hash.slice(1));
+  for (const [k, v] of h) {
+    if (!(k in S)) continue;
+    S[k] = ["cs", "ss", "pair", "topn", "bin", "win", "rawk", "rawss", "rawdup", "ctrl"].includes(k) ? (v === "" || v === "null" ? null : +v)
+         : ["tcand", "tthis", "sortasc", "osum", "weak"].includes(k) ? v === "true" : v;
+  }
+  if (!D.cs_ids.includes(S.cs)) S.cs = D.cs_ids[0];
+}
+function writeHash() {
+  const keep = ["cs", "tab", "ss", "pair", "rank", "topn", "bin", "win", "osum", "rawk", "rawss", "rawdup", "dupset", "sspair", "ctrl"];
+  history.replaceState(null, "", "#" + keep.map(k => `${k}=${S[k] ?? ""}`).join("&"));
+}
+
+// ---------- small helpers ----------
+const fmt = (v, nd = 2) => v === null || v === undefined || (typeof v === "number" && !isFinite(v)) ? "–"
+  : typeof v === "boolean" ? (v ? "y" : "n") : typeof v === "number" ? v.toFixed(nd) : String(v);
+const el = (tag, attrs = {}, ...kids) => {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") e.className = v; else if (k === "html") e.innerHTML = v;
+    else if (k.startsWith("on")) e.addEventListener(k.slice(2), v); else e.setAttribute(k, v);
+  }
+  for (const c of kids.flat()) if (c !== null && c !== undefined) e.append(c.nodeType ? c : document.createTextNode(c));
+  return e;
+};
+const sv = (tag, attrs = {}) => { const e = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); return e; };
+// ---------- ⓘ help: one hover note per card, matched on the card title (first matching pattern wins) ----------
+// Each entry: [regex on the title, () => HTML]. Numbers come from the parameters of THIS run (P) or of the raw layer.
+const ms = v => +(v * 1e3).toFixed(2);
+const PW = () => `${ms(P.PAUSE_WIN[0])}–${ms(P.PAUSE_WIN[1])} ms`;
+const BW = () => `${ms(P.BASELINE_WIN[0])}…${ms(P.BASELINE_WIN[1])} ms`;
+const RM = () => (window.CS_RAW || {}).meta || {};
+const H = (what, how, read) => `<p><b>What:</b> ${what}</p>` + (how ? `<p><b>How:</b> ${how}</p>` : "") + (read ? `<p><b>Read it:</b> ${read}</p>` : "");
+const PR_DEF = () => `pause ratio = mean SS rate ${PW()} after the CS ÷ SS baseline rate (${BW()} before the CS), from the coarse CCG (${ms(P.COARSE_BIN)} ms bins). 0 = complete silence, 1 = no change`;
+const INFO = [
+  // ----- sidebar / header
+  [/^__sidebar$/, () => H("<b>Left list:</b> one row per CS unit of this session (role CS = C4 label PkC_cs in the cerebellum). Click a row to show that CS in every tab; ↑/↓ also step through the list.",
+    "Badges: <b>SS t1 ×n</b> / <b>SS t2 ×n</b> = number of SS partner candidates (tier 1 = extra-good non-CS units; tier 2 = any other unit, any label, firing ≥ " + P.SS2_FR_MIN + " Hz). <b>no SS</b> = no candidate. <b>fam</b> = member of a duplicate family (CS units that may be the same cell; never merged). <b>pieces ×n</b> = clusters that fire inside this CS's event (spike-time decomposition). <b>spk x · n cap</b> (raw sessions only) = raw spikelets per event above the random-time rate, and the number of clusters capturing part of the event. <b>re-pair? X</b> (raw only) = the SS that pauses most in the current pause window is not step0's rank-1 SS. Second line: depth, firing rate in the reference window, spike count.",
+    "Filters: matched / unmatched / in a family / with any CS–CS pair; sort by depth or by phy id.")],
+  [/^__header$/, () => H("Identity card of the selected CS.",
+    "Line 1: C4 cell-type label, its confidence and votes, manual CS label. Line 2: reference window (the behaviour window selected for this session) spike count and firing rate (and the rate over the full recording); peak channel and depth. Line 3: the CS's <b>stable span</b> — the stretch around the reference window where its rate and amplitude stay stable (see Stability); all pair metrics use the overlap of both units' spans. Line 4: SS candidates with tier, label and pause ratio. Line 5: duplicate family and number of CS–CS pairs with evidence.",
+    "")],
+  // ----- Overview
+  [/^Autocorrelogram \(fine/, () => H("Autocorrelogram of the CS in its stable span, ±" + ms(P.ACG_FINE_WIN) + " ms, " + ms(P.ACG_FINE_BIN) + " ms bins.",
+    "For every spike, the times of all other spikes of the same unit within the window; y = rate of those spikes (sp/s) at each lag. The spike itself is excluded. Grey band = ±5 ms.",
+    "A clean CS has an empty centre (refractory period, typically ≥ 5–10 ms with almost no counts). Counts at ±1–3 ms mean doublets: the same CS detected twice (spikelets) or contamination by another unit.")],
+  [/^Autocorrelogram \(coarse/, () => H("Autocorrelogram of the CS, ±" + ms(P.ACG_COARSE_WIN) + " ms, " + ms(P.ACG_COARSE_BIN) + " ms bins.",
+    "Same as the fine ACG on a longer time scale.", "Shows the slow structure of CS firing (≈ 1 Hz, often a weak ~100 ms rhythm). A big central peak at short lags means a contaminated unit.")],
+  [/^ISI \(window\)/, () => H("Distribution of inter-spike intervals of the CS in its stable span (log time axis, 1 ms … 5 s).",
+    "Interval between consecutive spikes; log-spaced bins. The title gives the share of intervals shorter than " + ms(P.CS_MIN_ISI) + " ms.",
+    "For a CS this share should be ≈ 0. A visible bump below 10 ms = double detections or another unit mixed in.")],
+  [/^Template, peak ch/, () => H("The sorter's mean waveform (template) of this unit.",
+    "Peak channel in colour, neighbouring channels in grey, each trace placed at its channel's position on the probe. Template units as stored by the sorter; spans only ≈ ±1.4 ms around the spike, so later spikelets are not visible here (see Raw data).",
+    "Shape and spatial spread of the unit.")],
+  [/^Probe map \(purple CS/, () => H("Where this CS sits among its neighbours, ±300 µm around it.",
+    "Grey squares = probe channels; large purple dot = this CS; small purple dots = other CS; dark grey = tier-1 SS candidates, light grey = tier-2. Dots are jittered slightly so overlapping units stay visible.",
+    "")],
+  [/^Probe map \(ringed/, () => H("Probe map around the CS with the selected SS ringed in black.",
+    "Same symbols as the Overview probe map: large purple dot = CS, small purple = other CS, dark/light grey = tier-1/tier-2 SS candidates.", "")],
+  [/^Amplitude across the recording/, () => H("Amplitude of every CS spike over the whole recording (up to " + P.HTML_MAX_POINTS + " randomly chosen spikes).",
+    "Sorter amplitude per spike (template scaling). Grey band = reference window; light purple = the CS's stable span.",
+    "Look for drifts, jumps or the unit fading out: a stable unit is a horizontal band. Outside the span the unit is not used.")],
+  [/^Stability of/, () => H("How stable the unit is over time, relative to its own reference window.",
+    "Recording cut into " + P.STAB_BIN + " s bins. For each bin: firing rate ÷ reference rate (coloured) and median amplitude ÷ reference median amplitude (dark grey), on a log2 axis (0 = same as the reference, ±1 = double / half). A bin is stable if the rate is within ×/÷" + P.STAB_FR_TOL + " (dotted coloured lines) and the amplitude within ×/÷" + P.STAB_AMP_TOL + " (dotted grey). Starting from the reference window, the stable span grows outward bin by bin, only inside the behaviour period (green dashes), tolerating " + P.STAB_MAX_GAP + " isolated unstable bin; red ticks = unstable bins inside behaviour.",
+    "Grey = reference window, light purple = resulting stable span. Pair metrics use the overlap of the CS's and the SS's spans.")],
+  [/^Firing rate, 30 s bins/, () => H("Firing rate of the CS over the recording, 30 s bins.", "Spike count per bin ÷ 30 s. Grey = reference window, light purple = stable span.", "Slow changes in rate, silent periods, the unit appearing or disappearing.")],
+  [/^Sorter drift estimate/, () => H("Probe drift estimated by the spike sorter at the depth of this CS.",
+    "The sorter's drift trace (µm) at the depth bin closest to the CS. Grey = reference window, light purple = stable span.",
+    "Large drift steps often coincide with amplitude jumps or units being split or merged by the sorter.")],
+  // ----- Pairing
+  [/^Pairing funnel/, () => H("How many SS units survive each candidate criterion, applied cumulatively.",
+    "Starts from every SS unit tested against this CS (tier 1 + tier 2), then keeps those with " + PR_DEF() + " below " + P.CAND_PAUSE_RATIO_MAX + ", then asym > " + P.CAND_ASYM_MIN + ", then jitter p < " + P.CAND_JITTER_P_MAX + ", then no collision dip; the last row also requires that no other CS claims the same SS (display only, not part of the candidate rule). Purple = tier 1, grey = tier 2.",
+    "Shows which criterion removes most units.")],
+  [/^Criteria per SS/, () => H("Every criterion for the SS units of this CS (top N by the chosen ranking; ★ = candidate). Below the top N, any other SS that ranks #1 or #2 on pause, asym, jitter z, distance or the raw 3–8 ms pause is added, with a tag saying why, so no ranking can hide it.",
+    "<b>Required (all four):</b> <b>pause</b>: " + PR_DEF() + "; pass < " + P.CAND_PAUSE_RATIO_MAX + ". <b>asym</b>: mirror ratio (same window before the CS) − pause ratio; pass > " + P.CAND_ASYM_MIN + " (the dip must be after the CS, not symmetric). <b>jitter p</b>: each CS spike is moved by a random amount (uniform ±" + ms(P.JITTER_HALF) + " ms), " + P.N_SURR + " times; p = share of shuffles with as few SS spikes in " + PW() + " as observed; pass < " + P.CAND_JITTER_P_MAX + ". <b>no dip</b>: no collision dip — the fine CCG is below half its baseline on both sides of 0 (±" + ms(P.DIP_HALF) + " ms) while the coarse CCG after 1 ms is ≥ 0.8× baseline (the sorter cannot detect overlapping spikes; that gap is not a pause).<br>" +
+    "<b>Information only (grey headers):</b> <b>blocks max</b> = worst pause ratio across " + P.BLOCK_LEN / 60 + "-min blocks; <b>dur50</b> = time from the pause minimum until the SS rate is back at 50% of baseline; <b>zero peak</b> = fine-CCG rate within ±" + ms(P.ZERO_WIN[1]) + " ms ÷ fine baseline (a peak = spikes shared with the CS); <b>Lussac</b> = alternative test (median rate in the pause window < " + P.LUSSAC_FRAC + "× baseline median, and not in the mirror window); <b>CS shared</b> = share of CS spikes with an SS spike within ±" + ms(P.ZERO_WIN[1]) + " ms, minus Poisson chance (✗ > " + P.CS_SHARE_FLAG + "); <b>CS event</b> = share of CS events (" + ms(P.EVENT_WIN[0]) + "…+" + ms(P.EVENT_WIN[1]) + " ms) containing an SS spike, minus chance (✗ > " + P.CS_EVENT_FLAG + "); <b>pr 0–8 (v5)</b> = pause ratio in the old 0–8 ms window.<br>" +
+    "<b>claimed by</b> = all CS for which this SS is a candidate. <b>ref ★</b> = candidate when computed in the reference window only (red = differs from the stable-span result). <b>pair window</b> = overlap of both stable spans (s). " + (window.CS_RAW ? "<b>pr 3–8 ⓘ</b> = pause ratio recomputed by the raw layer (# = rank among this CS's SS)." : ""),
+    "Green = passes, red = fails. Click a row to open its detail below.")],
+  [/^CS event decomposition: CS \d+$/, () => H("No cluster fires inside this CS's event beyond chance.", "See the decomposition table description (Tables tab).", "")],
+  [/^CS event decomposition: clusters/, () => H("Clusters whose spikes fall inside this CS's event (" + ms(P.EVENT_WIN[0]) + "…+" + ms(P.EVENT_WIN[1]) + " ms after each CS spike) more often than chance — i.e. clusters that carry a piece of the CS.",
+    "For every cluster within " + P.EVENT_NEIGH_UM + " µm: <b>CS events with a spike</b> = share of CS spikes followed by ≥ 1 spike of the cluster in that window; <b>chance</b> = Poisson probability from the cluster's overall rate; <b>excess</b> = the difference (listed if ≥ " + P.EVENT_MIN_EXCESS + " and ≥ " + P.EVENT_MIN_N + " events). <b>own spikes CS-locked</b> = share of the cluster's own spikes that sit in a CS event. <b>lag</b> = median (IQR) time of its first spike in the event. <b>piece</b>: |median lag| ≤ " + ms(P.EVENT_ZERO_LAG) + " ms → zero-lag copy (the main CS spike detected again), later → late piece (spikelet / later component), earlier → earlier piece. <b>strong</b> = excess > " + P.CS_EVENT_FLAG + " or ≥ " + 100 * P.EVENT_LOCKED_MOST + "% of its spikes CS-locked. Weak rows are hidden unless toggled.",
+    "Chance is conservative (too high) for units that pause after the CS. A candidate SS that is listed here carries CS pieces; its pause is measured after them (" + PW() + "). Nothing is merged or excluded.")],
+  [/^Extra-good units below the tier-1 FR floor/, () => H("Extra-good units that would be SS partners but fire below the tier-1 floor (" + P.SS1_FR_MIN + " Hz) and are therefore never candidates.",
+    "Same pause metrics as for candidates; best 6 by pause ratio. <b>would be candidate</b> = passes the four candidate criteria.",
+    "Audit only. Switch the floor with SS1_FLOOR / STEP0_SS1_FLOOR (20 or 10 Hz).")],
+  [/^CCGs: SS with respect to CS/, () => H("Cross-correlogram of each SS (top N) relative to this CS.",
+    "For every CS spike, the SS spikes at each lag; y = SS rate (sp/s). Bin and window from the controls above. Dark shading = pause window " + PW() + "; light = baseline " + BW() + ". Purple title = candidate; ringed = selected.",
+    "A partner SS shows a clear dip just after 0 that is absent before 0. Click a CCG to open its detail.")],
+  [/^Latency test/, () => H("Does the SS fire later after the CS than before it? (Shin & De Schutter 2006 style; step0 v8)",
+    `For every CS in the pair window: L_post = time to the first SS spike more than ${ms(P.LAT_DEAD)} ms after the CS; L_pre = time back to the last SS spike more than ${ms(P.LAT_DEAD)} ms before it (same dead zone on both sides: skips CS pieces, the sorter's blind spot and the 0–2 ms ephaptic dip of neighbours). For an SS unrelated to the CS both are the same recurrence time, so L_pre is the null. One-sided Mann-Whitney (post > pre) and Cliff's delta. L_post and L_pre come from the same CS, so the samples are not fully independent.`,
+    `A partner: the purple histogram (after) is shifted right of the grey one (before), Cliff ≥ ${P.LIT_CLIFF_MIN}. With thousands of CS, p is small even for tiny shifts: read Cliff, not p.`)],
+  [/^SS\|CS vs SS\|SS/, () => H("Is the pause more than the SS unit's own refractoriness? (P-sort comparison, Sedaghat-Nejad et al. 2022)",
+    `SS|CS = SS rate after a CS (the coarse CCG); SS|SS = SS rate after an SS spike (its autocorrelogram), same 1 ms bins and SS spikes; both ÷ the mean SS rate. refr ratio = SS|CS ÷ SS|SS in ${PW()}; "below" = how long from ${ms(P.PAUSE_WIN[0])} ms SS|CS stays under SS|SS.`,
+    `A fast, regular SS is silent for a few ms after ANY of its own spikes: if SS|CS just follows SS|SS (ratio ~1), the "pause" is refractoriness, not the CS. A real pause sits well below SS|SS (ratio < ${P.LIT_REFR_RATIO_MAX}).`)],
+  [/^CS unit checks/, () => H("Literature checks on this CS train, on its own stable span (flags only, nothing excluded; step0 v8).",
+    `FR ${P.CS_FR_RANGE[0]}–${P.CS_FR_RANGE[1]} Hz and < ${100 * P.CS_ISI_5_35_MAX}% of ISIs in ${ms(P.CS_ISI_5_35[0])}–${ms(P.CS_ISI_5_35[1])} ms (Lussac paper v1 §4.2; Shin et al. 2007: 0.2–4.7 Hz); ISIs ${ms(P.CS_ISI_10_35[0])}–${ms(P.CS_ISI_10_35[1])} ms ÷ spikes (Lussac code v1); share of ISIs < ${ms(P.CS_MIN_IOI)} ms (minimum inter-CS interval ~50 ms in awake mice, Negrello et al. 2019); CV / CV2 (awake mouse reference ${P.CS_CV_REF} / ${P.CS_CV2_REF}, near-Poisson). Confounds: partial presence (span or occupied ${P.PRESENCE_BIN} s bins), poor isolation (ISI < 1 ms, sorter score).`,
+    "Source = which evidence made this unit a CS: C4 label, manual flag, screen (C4-unlabelled unit passing FR + ISI). The screen entry rule is FR and the 5–35 ms ISI check.")],
+  [/^Spatial check/, () => H("Where are the partners relative to the CS? (flags only; Calame et al. 2023; Han et al. 2020)",
+    `Peak-channel distance of all CS×SS pairs (chance) vs rank 1, candidate and candidate_lit; dy > 0 = the CS peak channel is farther from the probe tip than the SS's. The last rows: share of pairs > ${P.FP_UM} µm apart passing each rule — such pairs cannot be one cell, so this is an empirical false-positive rate.`,
+    `Partners should sit close (adjacent channels; a CS seen on the dendrite can be 100–200 µm away). far_flag = > ${P.FAR_UM} µm.`)],
+  [/^CS by source/, () => H("Every CS of this run by source, with its unit checks, pairing and whether it is a duplicate or piece of a C4 CS.",
+    "recovered CS = manual or screen CS that pairs (candidate or candidate_lit) and is not in a duplicate family with a C4 CS nor a strong piece of a C4 CS's event (either direction). Only Purkinje cells make both spike types, so pairing is the functional confirmation.", null)],
+  [/^Screen/, () => H("CS screen on C4-unlabelled units, plus the same checks on C4-labelled units for calibration (columns only).",
+    "C4 files hold a row only for units C4 labelled (top class only), so no soft C4 evidence exists for unlabelled units. Calibration: share of C4 PkC_cs passing = sensitivity; of PkC_ss / MLI / MFB / GoC = false alarms.", null)],
+  [/^Manual flag, kept as SS/, () => H("Manually flagged (or screen) units that are v7 SS candidates stay SS candidates (option A, Simon 2026-11-16), so every v7 pair stays identical.",
+    "Best pause = this unit as SS, its deepest pause ratio over all CS.", null)],
+  [/^Pause figure/, () => H("This CS → SS pair drawn like the figures of Han, Chen et al. 2020 (Nat Neurosci 23:1399, Fig. 1c and 8c): CS template, raster, SS rate, rate ÷ baseline with a 95% band, and the pair window cut in 4 equal parts next to a control SS.",
+    "From spike times (pause_figure_data.py), inside the pair window (overlap of both stable spans, as step0). Baseline = SS rate " + BW() + " before each CS. Raster: 300 random CS events in time order. Band: 2.5–97.5% of 200 resamples of the CS events. Quarters: each ÷ its own baseline. Control SS: by default the nearest SS that is not a candidate of this CS and not CS-flagged; pick any exported SS in the menu.",
+    "A real partner pauses in every quarter, and the control does not. A dip only in 0–2 ms (red shading), not in 3–8 ms, is what any nearby PC shows: a neighbour, not this CS's own cell.")],
+  [/^Raw CS overlay/, () => H("Raw voltage around CS events, many sweeps on top of each other (the classic CS + SS-pause picture).",
+    "raw_cs_overlay.py: 40 random CS events inside the pair window, −10…+30 ms, 300–6000 Hz band-pass after a common median reference. Left: the CS's peak channel; right: this SS's peak channel. Thin black = single sweeps, red = their mean. Below: sorter spikes in the same sweeps (red = CS, black = this SS). Exported for the CS's partner SS (or its step0 #1 SS) and its control SS; only sessions with a raw file on this computer.",
+    "A partner's spikes disappear for several ms after the CS in the sweeps and in the raster. Small SS spikes can hide in the noise band: then trust the raster and the Pause figure.")],
+  [/^Pause onset/, () => H("When the SS rate drops relative to the CS, at 0.2 ms resolution (their Fig. 1f–g).", "Top: the CS's sorter template on its peak channel (time 0 = template alignment point). Bottom: SS rate ÷ baseline, −2…+5 ms, with a 95% band.", "Own-cell pause: the SS stays silent into the 3–8 ms window. A neighbour's ephaptic dip: short, ~0–2 ms, then back to baseline.")],
+  [/^Ephaptic check: /, () => H("For every SS of the session, its rate right after this CS (0–2 ms) and in the pause window (3–8 ms), each ÷ its baseline, against the distance between the CS's and the SS's peak channels.",
+    "Han, Chen et al. 2020 showed that a CS briefly (~0–2 ms) suppresses the SS of NEIGHBOURING Purkinje cells through its extracellular field (ephaptic): strong at 25 µm, weaker at 50 µm, gone beyond ~75 µm. Their own cell's pause lasts much longer. Right: mean ± SEM rate curves of the non-partner SS in 4 distance groups.",
+    "Expect a 0–2 ms dip in grey dots within ~50 µm that is gone by 3–8 ms. Partners (purple) should be low in 3–8 ms. A grey SS low in 3–8 ms is a missed partner or a second cell paused by the same climbing fibre; low only in 0–2 ms means a neighbour. Orange \"SS\" carry CS spikes, so their 0–2 ms values say nothing about suppression.")],
+  [/^Ephaptic check \(session\)/, () => H("The same check for all CS × SS pairs of the session.", "Median and interquartile range of the 0–2 ms and 3–8 ms ratios per distance group; curves = mean ± SEM of the non-partner, non-flagged pairs.", "A dip at 0–2 ms that grows as distance shrinks reproduces the paper's ephaptic effect in our data.")],
+  [/^Same cell\? SS/, () => H("Two SS units that are both candidates of this CS (20 Hz or 10 Hz floor, see the title): are they one cell recorded twice (e.g. soma + axon, or a cell split by the sorter), or two cells that the same climbing fibre pauses? A = the faster unit, B = the other. Computed from the raw data (R5 local copy) by ss_same_cell_check.py, inside the overlap of both units' stable spans.",
+    "<b>Top left</b>: cross-correlogram, rate of B around A's spikes, ±3 ms, 0.05 ms bins; orange line = B's rate far from A (|lag| ≥ 15 ms); red band = the highest bin within ±1.5 ms ± " + ((window.CS_SSPAIR || {}).coinc_ms || 0.2) + " ms (the 'with' events). <b>Top right</b>: the same CCG at ±30 ms, 0.5 ms bins (black), with each unit's autocorrelogram (purple A, blue B), all divided by their own baseline. <b>Middle</b>: mean raw waveform (300 Hz high-pass, common median reference) on a strip of channels covering both units (one per 20 µm depth row plus each unit's 3 largest; purple = A's, blue = B's), at 0 = the trigger spike, for up to " + ((window.CS_SSPAIR || {}).n_ev || 1500) + " random events of each group: A with B (B at the peak lag), A without B (no B within ±1.5 ms), B with A, B without A; grey = random times. <b>Bottom</b>: per single event, the amplitude of B's mean waveform (on B's 3 channels, −0.5…+1 ms) that fits the raw signal best at A + lag (± 0.2 ms), and the reverse; 1 = a full-size spike, 0 = nothing; histograms normalised, medians in the legend.",
+    "<b>Soma + axon / same spikes at two sites</b>: sharp CCG peak at a fixed small lag far above the orange line, many 'with' events above chance, and A spikes <i>without</i> a detected B still carry B's waveform (red histogram near 1, B's channels not flat in 'A without B'). <b>One cell split by the sorter</b> (other spikes): the CCG copies the ACGs (refractory dip at 0), both units have the same waveform on the same channels. <b>Two cells</b>: flat CCG around 0, 'with' at chance, red histogram = black (random), each unit's channels flat when only the other fires. The reading line is a simple rule (signature excess > 0.4 → same cell?; peak > 3× with > 20% excess → duplicate; CCG within ±1 ms < 0.5× → same cell, split) — look at the plots.")],
+  [/^Detail: CS/, () => H("Summary of the selected CS→SS pair.",
+    "Line 1: ✓/✗ for every criterion (see Criteria per SS). Line 2: pair window = overlap of both stable spans, spike counts; result in the reference window alone. CS-spike sharing: share of CS spikes with an SS spike within ±" + ms(P.ZERO_WIN[1]) + " ms vs chance, and share of the SS's spikes sitting on a CS (red = flag). CS event: same for the whole event window (" + ms(P.EVENT_WIN[0]) + "…+" + ms(P.EVENT_WIN[1]) + " ms). v5 window: the old 0–8 ms values. Last line: lag of the deepest pause bin, time to recover to 50% / 80% of baseline, jitter z-score, jitter deficit (1 − observed / shuffled SS count; 1 = complete pause) and the SS baseline rate.",
+    "Flags never change the candidate decision.")],
+  [/^Coarse CCG ±50 ms/, () => H("SS rate around each CS spike, ±50 ms, 1 ms bins.", "Dark shading = pause window " + PW() + "; light = baseline " + BW() + ".", "Expect a dip right after 0 (≈ 10–20 ms for a real CS→SS pause) and a flat baseline before 0.")],
+  [/^Fine CCG ±10 ms/, () => H("SS rate around each CS spike, ±" + ms(P.FINE_WIN) + " ms, " + ms(P.FINE_BIN) + " ms bins. Dashed line = 0.",
+    "Same as the coarse CCG at high time resolution.",
+    "A narrow peak at 0 = the SS unit contains CS spikes (shared detections). A symmetric gap of ±0.5 ms around 0 = collision dip (the sorter misses overlapping spikes), not a pause.")],
+  [/^Fine CCG$/, () => H("Fine CCG not stored for this pair.", "Only candidates and top-ranked SS are exported to keep the page small.", "")],
+  [/^Autocorrelogram SS/, () => H("Autocorrelogram of the SS, ±" + ms(P.ACG_FINE_WIN) + " ms, " + ms(P.ACG_FINE_BIN) + " ms bins.", "Same method as the CS fine ACG.", "A good SS (tens of Hz) has a short refractory gap (≈ 1–3 ms) and no peak at 0.")],
+  [/^Template SS/, () => H("Sorter template of the SS (peak channel dark, neighbours grey, placed like the probe).", "Template units as stored by the sorter, ≈ ±1.4 ms.", "")],
+  [/^Per-block pause ratio/, () => H("Pause ratio of this pair in consecutive " + P.BLOCK_LEN / 60 + "-minute blocks of the pair window.",
+    "Same pause ratio as the main one, but with CS spikes and SS spikes from one block only (blocks with < 20 CS spikes are left out). Solid line at 1 = no pause; dotted = candidate threshold " + P.CAND_PAUSE_RATIO_MAX + ".",
+    "A real partner pauses in every block. A pause in only some blocks = unstable unit or a sorter split over time.")],
+  [/^Per-block CCGs/, () => H("The CCG of each block, overlaid (colour = block start, minutes).", "Same bins as the coarse CCG; shading = pause window " + PW() + ".", "Check that the dip is present in all blocks.")],
+  [/^Raw data: mean waveform of SS/, () => H("Mean of the SS's raw recording around its own spikes, −2…+8 ms.",
+    "Up to " + (RM().n_mean || 500) + " random spikes in its stable span; raw AP band, " + (RM().hp_hz || 300) + " Hz high-pass, common median reference, µV. One small trace per channel within ±100 µm of the peak, placed like the probe; peak channel dark. Thin vertical line = spike time.",
+    "Shows the full SS waveform, beyond the sorter template.")],
+  [/CS-locked spikes vs its other spikes/, () => H("Does this unit fire its own spikes, or does it pick up pieces of a CS?",
+    "The unit's spikes are split into <b>CS-locked</b> (red: " + (RM().capture_win_ms ? RM().capture_win_ms[0] + "…+" + RM().capture_win_ms[1] : "−0.5…+4") + " ms after a spike of a CS whose event it captures) and <b>all others</b> (grey). Raw mean of each set (up to " + (RM().n_mean || 500) + " spikes), aligned on the unit's own spike time, on its 8 largest channels. Common voltage scale; two columns of channels (by depth, left first).",
+    "Same shape → the CS-locked spikes are this unit's own spikes that happen to follow the CS. Different shape (e.g. the CS waveform or a spikelet) → those spikes are pieces of the CS assigned to this cluster by the sorter.")],
+  // ----- Duplicates
+  [/^Duplicate evidence$/, () => H("No CS–CS pair with a duplicate flag or a sharp CCG peak involves this CS.", "", "")],
+  [/^Evidence votes/, () => H("Are two CS units the same cell? One column per partner CS (* = duplicate candidate: > " + P.DUP_COINC_MIN + " of the smaller unit's spikes coincide with the other's at the CCG peak lag).",
+    "Each row is one independent line of evidence; each votes +1 (same cell, green), −1 (different cells, red) or 0 (grey, not informative / not testable). Hover each row's ⓘ for its exact rule. <b>coincidence</b> = share of the smaller unit's spikes with a partner within ±" + ms(P.COINC_DELTA) + " ms of the peak lag. <b>lag jitter</b> = robust SD of that lag. <b>union ISIs</b> = new " + ms(P.UNION_ISI_RANGE[0]) + "–" + ms(P.UNION_ISI_RANGE[1]) + " ms intervals created by merging, ÷ the number expected for independent trains (one cell cannot fire two CS that close). <b>shared SS</b> = both pause the same SS. <b>co-silencing</b> = pause of one unit's own SS after the OTHER unit's non-coincident spikes. <b>footprint</b> = cosine of the template peak-to-peak across channels. <b>amp/depth covar</b> = correlation of the coincident spikes' amplitudes or depths (detrended per " + P.DETREND_BIN + " s).",
+    "votes = +support / −against; status: converges (≥ " + P.EV_CONVERGE_MIN + " one way, none the other), leans, conflicting or insufficient. Nothing is ever merged. Click a column to select the pair.")],
+  [/^Decision path/, () => H("Which descriptive type the pair falls into (highlighted path).",
+    "<b>Tight lock</b>: lag SD ≤ " + ms(P.EV_LAG_SD[0]) + " ms and coincidence ≥ " + P.EV_COINC[0] + ". Then |lag| ≤ " + ms(P.COINC_DELTA) + " ms → <b>same-event re-detection</b> (one spike detected twice); otherwise → <b>fixed-lag component</b> (a later piece of the same event, e.g. a spikelet). Not tight: lag SD ≥ " + ms(P.EV_LAG_SD[1]) + " ms or different SS partners → <b>synchrony-like</b> (two cells firing together); else <b>unclear</b>. <b>Partial split</b> check: coincidence " + P.EV_COINC[1] + "–0.9 and slow rates or amplitudes anti-correlated (one cluster takes over from the other). Bottom box: votes and status.",
+    "A type is a description, not a decision: every pair goes to manual review.")],
+  [/^Selected pair/, () => H("Numbers of the selected CS–CS pair (lags are of the second unit relative to the first).",
+    "Pair window (overlap of both stable spans); coincidence in the reference window; CCG peak lag and width (FWHM); distance; spike counts split into coincident / first-only / second-only; SS partners of each; union: new short ISIs vs expected; doublets = share of each unit's own ISIs < " + ms(P.DOUBLET_ISI) + " ms; ss_cond = pause of each partner SS after the other unit's non-coincident spikes; SS pause after the coincident spikes; family; status.",
+    "")],
+  [/^Waveforms side by side/, () => H("Sorter templates of the two CS: the first (purple) at its spike time, the second (blue) shifted by the measured CCG peak lag, on shared channels.",
+    "Rows = channels (◆ = each unit's peak channel), same scale for both. Blue bands = spread of the second unit's spike time around the peak lag (dark = IQR, light = 10–90%). Option: dashed black = sum of both.",
+    "Re-detection: the blue trace sits on the purple main deflection. Fixed-lag component: blue sits on a separate, later deflection. Templates cover only ≈ ±1.4 ms; later pieces need the raw means below.")],
+  [/^Single raw events of CS/, () => H("Individual events of the CS–CS pair, not averaged: does the second unit fire as a separate, later piece of the same event as the first (spikelet), are the two detections of one spike, or are they two cells?",
+    "The pair is ordered so that the <b>first</b> unit fires first at the CCG peak. <b>both</b> = events of the first unit with a spike of the second within the peak lag ± " + ms(P.COINC_DELTA) + " ms; <b>X only</b> = events without a partner (second-only snippets are shifted so its spike sits at the peak lag, same time frame). Up to 40 'both' and 15 of each single type, chosen at random. Raw traces " + ((window.CS_RAW_DUPEV || {}).win_ms || [-3, 10]).join("…+") + " ms around the first unit's spike, on the 2 largest channels of each unit (columns; coloured header = that unit's peak channel), " + (RM().hp_hz || 300) + " Hz high-pass, common median reference. One row per event, sorted by the measured lag; left = time of the event in the recording. Top tick (purple) = every spike of the first unit inside the window; bottom tick (blue) = every spike of the second unit. Each channel has its own scale (median peak-to-peak of the shown events). Right: lag of the second unit in ALL 'both' events. Top numbers: peak lag, counts, and the share of 'both' events containing a further spike of either unit (repeated detections).",
+    "<b>Spikelet</b>: the second unit's tick sits on a separate, later deflection that follows the main spike in every 'both' row, and the first-only rows lack it (or show it without a tick). <b>Same spike detected twice</b>: both ticks sit on the same deflection (lag ≈ 0). <b>Two cells</b>: the deflections differ in shape or channel and the lag varies from row to row.")],
+  [/^Raw means: CS|^Raw: \d+ \/ \d+/, () => H("Raw-data mean waveforms of the two CS, with events split into three groups.",
+    "<b>coincident</b> (black) = events where both units fired (within ±" + ms(P.COINC_DELTA) + " ms of the peak lag); <b>first-only</b> (purple) = only the first unit; <b>second-only</b> (blue) = only the second, shifted by the peak lag so all three line up with the first unit. Up to " + (RM().n_mean || 500) + " events per group (≥ 20 needed), raw AP band, " + (RM().hp_hz || 300) + " Hz high-pass, common median reference, −2…+8 ms. Channels = union of both units' 6 largest channels, by depth, in two columns, one common voltage scale. Top numbers: coincidence, peak lag, cosine similarity of the two units' full means (all and after 1.5 ms only), step0 evidence status.",
+    "Same waveform in all three → one cell detected twice. The coincident mean has an extra late part the singles lack → the two clusters split one event into pieces. Single-unit means on different channels → two cells.")],
+  [/^Fine CCG: \d+ relative to/, () => H("Fine cross-correlogram between the two CS, ±" + ms(P.FINE_WIN) + " ms, " + ms(P.FINE_BIN) + " ms bins.", "y = rate of the second unit around each spike of the first. Shaded = ±" + ms(P.COINC_DELTA) + " ms around the peak lag (the coincidence window).", "A tall narrow peak = the two units fire together at a fixed lag.")],
+  [/^Lag jitter/, () => H("Spread of the lag between coincident spikes.", "For each spike of the first unit, the nearest spike of the second within ±" + ms(P.LAG_SPREAD_WIN) + " ms of the peak lag; histogram of its offset from the peak lag. Robust SD = 1.4826 × median absolute deviation.", "Very narrow (≤ " + ms(P.EV_LAG_SD[0]) + " ms) = locked to the same event; broad (≥ " + ms(P.EV_LAG_SD[1]) + " ms) = loose synchrony of two cells.")],
+  [/^Rates over time/, () => H("Firing rates of both CS and of their coincident spikes over the pair window, " + P.DETREND_BIN + " s bins.", "purple = first unit, blue = second, black = coincident spikes. Title: correlation of the two rates.", "Anti-correlated rates (one goes up when the other goes down) suggest the sorter hands one cell over between two clusters.")],
+  [/^CS→SS CCGs: /, () => H("For each SS partner of either CS of the pair: the CCG of CS A → that SS (purple) and of CS B → the same SS (blue), overlaid. If neither CS has a candidate, each CS's rank-1 SS is shown.",
+    "The step0 coarse CCG of each CS×SS pair (all spikes of the CS in that pair's window = overlap of the CS's and the SS's stable spans), ±50 ms, 1 ms bins, each divided by its own baseline (mean " + BW() + ") so the two CS are comparable even if their windows or rates differ. Light band = baseline, dark band = pause window " + PW() + ", line at 1 = baseline. Below each plot: the step0 metrics of each CS with that SS (★ = candidate; rank among that CS's SS; window).",
+    "Same cell detected twice → both CS pause the same SS with the same depth, onset and duration. A fixed-lag piece (spikelet) → same pause, shifted by the lag between the two CS. Two cells → only one CS pauses this SS, or the pauses differ clearly. For all spikes together this view cannot separate the units' coincident and non-coincident spikes: see Co-silencing for that.")],
+  [/^Co-silencing/, () => H("Do both CS silence the same SS?",
+    "For the SS partners of either unit (up to 2): SS rate around three sets of CS spikes — coincident (black), first-only (purple), second-only (blue) — normalised by the SS's own baseline. Dashed = second SS. Light band = baseline " + BW() + ", dark band = pause window " + PW() + ". pr in the legend = pause ratio (needs ≥ " + P.MIN_SPIKES_COND + " spikes).",
+    "If the second unit's spikes alone still silence the first unit's SS, the two are probably one cell.")],
+  [/^Template footprints/, () => H("Where on the probe each CS template has signal.", "Template peak-to-peak per channel ÷ its own maximum, maximum per depth, against probe depth; purple = first, blue = second. Shaded = depths where both footprints exceed " + P.FOOTPRINT_FRAC + " of their maximum. Title: number of shared channels and cosine similarity (needs ≥ " + P.FOOTPRINT_MIN_OVERLAP + " shared channels).", "Same profile = same source location; offset profiles = different cells (or different compartments).")],
+  [/of coincident spikes/, () => H("For the coincident spikes only: one value of the first unit vs the second.", "Sorter amplitude (or spike depth) per spike, with the per-" + P.DETREND_BIN + " s median removed from each (detrended, so common drift does not create a correlation); up to " + P.HTML_MAX_POINTS + " points. Title: correlation r.", "Positive correlation → both clusters see the same spike fluctuating together (same cell).")],
+  // ----- Tables
+  [/^CS × SS pairs/, () => H("Every CS × SS pair of the session with all pair metrics.", "Same columns as Criteria per SS (see there). Toggles: candidates only / this CS only. Click a header to sort, a row to open it in Pairing.", "")],
+  [/^CS – CS evidence/, () => H("Every CS–CS pair with a duplicate flag or a sharp CCG peak, with all evidence values and votes.", "See Evidence votes for the definitions. Click a row to open it in Duplicates.", "")],
+  [/^CS event decomposition \(/, () => H("The CS event decomposition for all CS (or this CS): clusters firing inside CS events beyond chance.",
+    "See the description of the decomposition card in Pairing: window " + ms(P.EVENT_WIN[0]) + "…+" + ms(P.EVENT_WIN[1]) + " ms, excess = share of CS events with a spike − Poisson chance, lag, piece type, share of the cluster's spikes that are CS-locked.", "Click a row to open its CS.")],
+  [/^Tier-1 units below the FR floor/, () => H("All CS × extra-good pairs excluded by the tier-1 FR floor (" + P.SS1_FR_MIN + " Hz).", "Same metrics as candidates; <b>would be candidate</b> = passes the four criteria. Toggle 'candidates only' to see just those.", "")],
+  [/^Conflicts/, () => H("Situations to resolve by hand (nothing is resolved automatically).", "SS claimed by more than one CS; CS with more than one SS; CS–CS duplicate candidates that share an SS.", "")],
+  [/^Duplicate families/, () => H("Groups of CS connected by duplicate-candidate pairs (A~B and B~C → one family A, B, C).", "Not merged; listed for manual review.", "")],
+  [/^Session$/, () => H("Session metadata: mouse, session, probe, sorter folder, windows (reference, behaviour), run tag, build time.", "", "")],
+  [/^Parameters used/, () => H("Every parameter of the step0 run that produced this page.", "Times in seconds. These are the values all descriptions on this page refer to.", "")],
+  // ----- Raw data
+  [/^All CS of the session in raw data/, () => H("One row per CS: what its event looks like in the raw recording, and the pairing re-check.",
+    "<b>events</b> = CS spikes in the stable span; <b>pol.</b> = polarity of the main spike on its peak channel; <b>detections/event</b> = spikelets found by the detector after each CS (see Spikelet detections); <b>random times</b> = the same detector at random times (false positives); <b>excess spikelets</b> = the difference (green > 0.2, grey < 0.05); <b>0 det.</b> = share of events with no detection; <b>capturing clusters</b> and the top one with its excess; <b>step0 #1 SS</b> and <b>best 3–8 SS</b> with their pause ratios in 0–8 and 3–8 ms.",
+    "Red = the SS with the deepest pause in 3–8 ms (< 0.75) is not step0's rank-1 SS. Click a row to switch CS.")],
+  [/^Raw data: source and preprocessing/, () => H("Where the raw traces come from and how they are processed.", "Raw AP-band file (local copy; Dropbox is never written), snippets around each spike time (= sorter template trough), µV, mean removed per channel, common median reference across channels, " + (RM().hp_hz || 300) + " Hz zero-phase high-pass. Each unit's mean uses up to " + (RM().n_mean || 500) + " random spikes in its stable span.", "")],
+  [/^Mean raw waveform of CS/, () => H("Mean raw waveform of the CS, −2…+8 ms, laid out like the probe.",
+    "Up to " + (RM().n_mean || 500) + " random CS events; one small trace per channel within ±100 µm of the peak (rows = depth, columns = x position), all on one scale; peak channel in colour; thin line = spike time. Caption: peak-to-peak of the largest channel.",
+    "Unlike the sorter template (±1.4 ms) this shows the whole complex spike: the main spike and the spikelets that follow it over several ms.")],
+  [/^Peak-to-peak along the whole probe/, () => H("How far along the probe each unit's mean waveform reaches.",
+    "Peak-to-peak of the mean raw waveform on every channel, maximum per depth, divided by the unit's own maximum (1 = its peak). Purple = this CS; colours = its capturing clusters (same colours as in the table); grey line = CS depth.",
+    "A capturing cluster whose profile matches the CS's = same source. A second bump far from the CS peak = the CS event is also seen there (e.g. a remote re-detection, or an axon/dendrite signal).")],
+  [/^Clusters that capture part of CS/, () => H("Clusters (any label, within 250 µm) that fire inside this CS's event more often than chance.",
+    "<b>CS events with a spike</b> = share of CS spikes followed by ≥ 1 spike of the cluster " + (RM().capture_win_ms ? RM().capture_win_ms[0] + "…+" + RM().capture_win_ms[1] : "−0.5…+4") + " ms later; <b>chance</b> = Poisson from the cluster's rate; <b>excess</b> = difference (listed if ≥ 0.05 and ≥ 30 events); <b>own spikes CS-locked</b> = share of the cluster's spikes inside a CS event; <b>lag</b> = median (IQR) of its first spike in the event; last two columns = share of CS events with a raw spikelet near that lag (IQR ± 0.3 ms) when the cluster fired vs when it did not.",
+    "Spikelet present either way → the spikelet is part of the CS and the sorter assigns only some of them to this cluster. Spikelet mainly when it fired → this cluster's spikes are that spikelet. Click a row to select the cluster for the plots below.")],
+  [/^Spikelet detections per CS event/, () => H("How many spikelets follow each CS, compared with what the detector finds by chance.",
+    "On the CS peak channel, after removing the mean CS waveform, the noise SD is measured before the spike. Spikelets = peaks with the main spike's polarity, larger than " + (RM().spk_thr || 3.5) + "× that SD and with prominence ≥ " + (RM().spk_prom || 2) + "× SD, at least 0.4 ms apart, " + (RM().spk_win_ms ? RM().spk_win_ms[0] + "–" + RM().spk_win_ms[1] : "0.5–8") + " ms after the spike. Purple = CS events; grey = the same detector on snippets at random times (≥ 20 ms from any CS spike). x = detections per event (6 = 6+).",
+    "The excess (title) is the meaningful number: single-event counts include background spikes of other cells on the same channel.")],
+  [/^When do raw spikelets occur/, () => H("Timing of the detected spikelets after the CS spike.", "Black bars = spikelets per 0.1 ms bin over all CS events; red line = detections at random times, scaled to the same number of events; dashed coloured lines = median lag of each capturing cluster.", "Peaks above the red line = spikelets at preferred lags. A capturing cluster's dashed line on a peak = that cluster picks up that spikelet.")],
+  [/^Spikelets per event over the recording/, () => H("Spikelets per CS event over time (purple, 60 s bins) and the median main-spike amplitude (grey, rescaled to the same axis).", "", "If the spikelet count follows the main-spike amplitude, the change is a recording effect (smaller spikes → fewer spikelets above threshold), not physiology.")],
+  [/^Main-spike amplitude by spikelet count/, () => H("Median main-spike amplitude (µV, peak channel) of events with 0, 1, 2 … 6+ detected spikelets.", "", "A strong trend means detection depends on amplitude.")],
+  [/^Every CS \d+ event \(heat map/, () => H("Every CS event as one row of a heat map.",
+    "Rows = events, sorted by spikelet count (black lines separate the groups, labelled at the right), then by main-spike amplitude; columns = time −2…+8 ms; colour = peak-channel voltage (blue = negative, red = positive, scale = 99th percentile). Middle strip: one column per capturing cluster (up to 10), coloured when that cluster had a spike −0.5…+4 ms after the CS. Right: main-spike amplitude per row. Links open the full-size figure and the per-CS summary pages.",
+    "Each spikelet appears as a streak at a fixed lag. A cluster column that fills exactly the rows with a given streak = that cluster is that spikelet.")],
+  [/single CS events on peak ch/, () => H("Up to 40 randomly chosen individual CS events on the peak channel.", "Grey (or coloured when the selected cluster fired in that event) = single raw traces; dots = detected spikelets; thick black = the mean of all events; shaded = the spikelet search window.", "Gives a feel for the event-to-event variability behind the averages.")],
+  [/^CS \d+ events with \(colour|^Conditional means for cluster/, () => H("Does the selected cluster take a specific piece of the CS event?",
+    "CS events are split into those where the selected cluster fired " + (RM().capture_win_ms ? RM().capture_win_ms[0] + "…+" + RM().capture_win_ms[1] : "−0.5…+4") + " ms after the CS (colour) and those where it did not (grey). Raw mean of each group (≥ 20 events per side), aligned on the CS spike, on the CS's 8 largest channels plus the cluster's peak channel. Dashed = the cluster's median lag. Common scale; two columns of channels.",
+    "An extra deflection at the dashed line only in the coloured mean → the cluster takes that component in some events. The component in both means → it is always there and the sorter catches only part of it.")],
+  [/^Mean raw waveform of cluster/, () => H("Mean raw waveform of the selected cluster at its own spike times (all its spikes, not only CS-locked ones), laid out like the probe.", "Same processing as the CS mean.", "Compare with the CS mean: the same shape at the same place suggests the cluster is a piece of the CS.")],
+  [/^All capturing clusters of CS/, () => H("The with / without comparison for every capturing cluster at once, on the CS peak channel (static figure).", "Red = events with a spike of the cluster, grey = without; black (shifted down) = difference; dashed = the cluster's lag.", "A sharp component in the difference at the cluster's lag = it carries a piece of the CS event. A flat difference = it only fires near CS time.")],
+  [/^Pairing re-check for CS/, () => H("Pause of each SS after this CS, in three windows, computed by the raw layer from spike times.",
+    "For the SS ranked highest by step0 and by the 3–8 ms pause (up to 6 each): SS rate in 0–8 ms (v5 window, still containing the CS event), 3–8 ms (current pause window) and 8–16 ms (late), each ÷ the SS baseline " + BW() + ". <b>step0 rank</b> / <b>rank 3–8</b>, step0 candidate ★, tier, distance, FR, CS-spike sharing excess, jitter p from step0.",
+    "Green < 0.75, red > 0.95. A unit that pauses strongly in 3–8 but not in 0–8 carries CS pieces in its first milliseconds. Click a row to add its CCG to the plot below.")],
+  [/^CCGs, 0\.5 ms bins/, () => H("SS rate around the CS spike (÷ SS baseline), −20…+50 ms, 0.5 ms bins, 3-bin smoothing.", "Up to three SS: step0's rank 1, the best in 3–8 ms, and the one selected in the table. Grey shading = 0–8 ms, blue = 3–8 ms; line at 1 = baseline.", "Compare where each SS starts and ends its pause, and whether it fires extra spikes in the first ms (CS pieces).")],
+];
+function infoFor(title) {
+  const t = typeof title === "string" ? title : (title?.textContent || "");
+  for (const [re, f] of INFO) if (re.test(t)) { try { return f(); } catch (e) { return null; } }
+  return null;
+}
+function infoIcon(title) {
+  const h = infoFor(title); if (!h) return null;
+  return el("span", { class: "infoi", tabindex: "0", "aria-label": "what is plotted" }, "i", el("div", { class: "pop", html: h }));
+}
+const card = (title, body, cls = "", note = "") => el("div", { class: "card " + cls },
+  infoIcon(title), el("h3", {}, title), note ? el("div", { class: "note" }, note) : null, body);
+const unitOf = id => D.units[id];
+const pairOf = (cs, ss) => D.pairs[`${cs}_${ss}`];
+const pairsOfCs = cs => D.ss_ids.map(ss => pairOf(cs, ss)).filter(Boolean);
+const famOf = cs => { for (const [k, m] of Object.entries(D.families)) if (m.includes(cs)) return m; return null; };
+const dupsOf = cs => D.dups.filter(d => d.cs_a === cs || d.cs_b === cs)
+  .sort((x, y) => y.coinc_frac_peak - x.coinc_frac_peak);
+const partner = (d, cs) => d.cs_a === cs ? d.cs_b : d.cs_a;
+function niceTicks(lo, hi, n = 5) {
+  if (!(hi > lo)) return [lo];
+  const step0 = (hi - lo) / n, mag = Math.pow(10, Math.floor(Math.log10(step0)));
+  const step = [1, 2, 2.5, 5, 10].map(m => m * mag).find(s => s >= step0) || step0;
+  const out = []; for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) out.push(+v.toFixed(10));
+  return out;
+}
+
+// ---------- chart: a minimal SVG plotting helper ----------
+function chart({ w = 330, h = 170, xlim, ylim, xlabel = "", ylabel = "", logx = false, ml = 44 }) {
+  const m = { l: ml, r: 8, t: 6, b: 30 };
+  const s = sv("svg", { width: "100%", viewBox: `0 0 ${w} ${h}`, preserveAspectRatio: "xMidYMid meet" });
+  const X = v => logx ? Math.log10(v) : v;
+  const [x0, x1] = [X(xlim[0]), X(xlim[1])], [y0, y1] = ylim;
+  const sx = v => m.l + (X(v) - x0) / (x1 - x0) * (w - m.l - m.r);
+  const sy = v => h - m.b - (v - y0) / ((y1 - y0) || 1) * (h - m.t - m.b);
+  const g = sv("g"); s.append(g);
+  const clip = `c${Math.random().toString(36).slice(2)}`;
+  const cp = sv("clipPath", { id: clip }); cp.append(sv("rect", { x: m.l, y: m.t, width: w - m.l - m.r, height: h - m.t - m.b }));
+  s.append(cp); g.setAttribute("clip-path", `url(#${clip})`);
+  const axes = sv("g"); s.append(axes);
+  axes.append(sv("path", { class: "ax", d: `M${m.l},${m.t}V${h - m.b}H${w - m.r}` }));
+  const xt = logx ? [1e-3, 1e-2, 1e-1, 1, 10].filter(v => v >= xlim[0] && v <= xlim[1]) : niceTicks(xlim[0], xlim[1], 5);
+  for (const v of xt) { axes.append(sv("line", { class: "tick", x1: sx(v), x2: sx(v), y1: h - m.b, y2: h - m.b + 3 }));
+    const t = sv("text", { x: sx(v), y: h - m.b + 13, "text-anchor": "middle" }); t.textContent = logx ? `${v}` : +v.toFixed(6); axes.append(t); }
+  for (const v of niceTicks(y0, y1, 4)) { axes.append(sv("line", { class: "tick", x1: m.l - 3, x2: m.l, y1: sy(v), y2: sy(v) }));
+    const t = sv("text", { x: m.l - 5, y: sy(v) + 3, "text-anchor": "end" }); t.textContent = +v.toFixed(6); axes.append(t); }
+  const xl = sv("text", { x: (m.l + w - m.r) / 2, y: h - 3, "text-anchor": "middle", class: "muted" }); xl.textContent = xlabel; axes.append(xl);
+  const yl = sv("text", { x: 10, y: (h - m.b + m.t) / 2, "text-anchor": "middle", class: "muted",
+                          transform: `rotate(-90 10 ${(h - m.b + m.t) / 2})` }); yl.textContent = ylabel; axes.append(yl);
+  const api = {
+    el: s, sx, sy,
+    shade(a, b, color = COL.shade) { g.prepend(sv("rect", { x: sx(a), y: m.t, width: Math.max(0, sx(b) - sx(a)), height: h - m.t - m.b, fill: color })); return api; },
+    bars(left, y, bw, color = "#333") { let d = ""; const base = sy(Math.max(y0, 0));
+      for (let i = 0; i < y.length; i++) { if (y[i] === null) continue; const xa = sx(left[i]), xb = sx(left[i] + bw), yy = sy(y[i]);
+        d += `M${xa},${base}V${yy}H${xb}V${base}Z`; }
+      g.append(sv("path", { d, fill: color, stroke: "none" })); return api; },
+    step(left, y, bw, color, opts = {}) { let d = "";
+      for (let i = 0; i < y.length; i++) { if (y[i] === null) continue; d += `${d ? "L" : "M"}${sx(left[i])},${sy(y[i])}H${sx(left[i] + bw)}`; }
+      g.append(sv("path", { d, fill: "none", stroke: color, "stroke-width": opts.lw || 1.3, "stroke-dasharray": opts.dash || "" })); return api; },
+    line(x, y, color, opts = {}) { let d = ""; for (let i = 0; i < y.length; i++) { if (y[i] === null || x[i] === null) continue; d += `${d ? "L" : "M"}${sx(x[i])},${sy(y[i])}`; }
+      g.append(sv("path", { d, fill: "none", stroke: color, "stroke-width": opts.lw || 1.2, "stroke-dasharray": opts.dash || "", "stroke-opacity": opts.op ?? 1 })); return api; },
+    dots(x, y, color = COL.dot, r = 1.4) { for (let i = 0; i < x.length; i++) if (x[i] !== null && y[i] !== null)
+      g.append(sv("circle", { cx: sx(x[i]), cy: sy(y[i]), r, fill: color })); return api; },
+    band(x, lo, hi, color = "#999", op = 0.3) { let d = "", k = 0;
+      for (let i = 0; i < x.length; i++) if (lo[i] !== null && hi[i] !== null) d += `${k++ ? "L" : "M"}${sx(x[i])},${sy(hi[i])}`;
+      for (let i = x.length - 1; i >= 0; i--) if (lo[i] !== null && hi[i] !== null) d += `L${sx(x[i])},${sy(lo[i])}`;
+      if (d) g.append(sv("path", { d: d + "Z", fill: color, "fill-opacity": op, stroke: "none" })); return api; },
+    ticks(x, y, color = "#222", len = 0.8) { let d = "";      // raster: short vertical marks at (x, y ± len/2)
+      for (let i = 0; i < x.length; i++) d += `M${sx(x[i])},${sy(y[i] - len / 2)}V${sy(y[i] + len / 2)}`;
+      g.append(sv("path", { d, stroke: color, "stroke-width": 1, fill: "none" })); return api; },
+    vline(v, color = "#777", dash = "3,3") { g.append(sv("line", { x1: sx(v), x2: sx(v), y1: m.t, y2: h - m.b, stroke: color, "stroke-dasharray": dash })); return api; },
+    hline(v, color = "#999", dash = "3,3") { g.append(sv("line", { x1: m.l, x2: w - m.r, y1: sy(v), y2: sy(v), stroke: color, "stroke-dasharray": dash })); return api; },
+    legend(items) { items.forEach(([lab, color], i) => { const y = m.t + 10 + i * 12;
+      axes.append(sv("rect", { x: w - m.r - 118, y: y - 7, width: 9, height: 3, fill: color }));
+      const t = sv("text", { x: w - m.r - 105, y }); t.textContent = lab; axes.append(t); }); return api; },
+  };
+  return api;
+}
+const maxOf = a => Math.max(1e-9, ...a.filter(v => v !== null && isFinite(v)));
+const minOf = a => Math.min(...a.filter(v => v !== null && isFinite(v)));
+const range = (n, a, b) => Array.from({ length: n }, (_, i) => a + i * b);
+
+function ccgChart(y, binS, winS, { color = "#333", shadePause = true, title = "", h = 150, vlines = [] } = {}) {
+  const n = y.length, left = range(n, -winS * 1e3, binS * 1e3);
+  const c = chart({ h, xlim: [-winS * 1e3, winS * 1e3], ylim: [0, maxOf(y) * 1.08], xlabel: "time lag (ms)", ylabel: "rate (sp/s)" });
+  if (shadePause) { c.shade(P.BASELINE_WIN[0] * 1e3, P.BASELINE_WIN[1] * 1e3, COL.shade2); c.shade(P.PAUSE_WIN[0] * 1e3, P.PAUSE_WIN[1] * 1e3); }
+  vlines.forEach(v => c.vline(v));
+  c.bars(left, y, binS * 1e3, color);
+  return c.el;
+}
+// crop / rebin an exported ±HTML_CCG_WIN, 1 ms coarse CCG
+function cropRebin(y, bin, win) {
+  const W = P.HTML_CCG_WIN * 1e3, n = y.length, i0 = Math.round(W - win), i1 = Math.round(W + win);
+  const out = []; for (let i = i0; i < i1; i += bin) { let s = 0; for (let k = 0; k < bin; k++) s += y[i + k]; out.push(s / bin); }
+  return out;
+}
+
+function templateSvg(u, color = COL.cb) {
+  const t = u.template, s = sv("svg", { width: "100%", viewBox: "0 0 220 170" });
+  const w = t.w, ns = w[0].length, amp = Math.max(1e-9, ...w.map(r => Math.max(...r) - Math.min(...r)));
+  const pkRow = w[t.ch.indexOf(t.peak)];
+  const pkAmp = Math.max(...pkRow) - Math.min(...pkRow);
+  for (let j = 0; j < w.length; j++) {
+    const x0 = 110 + t.dx[j] / 32 * 46 - 22, y0 = 85 - t.dy[j] / 20 * 30;
+    let d = ""; for (let i = 0; i < ns; i++) d += `${i ? "L" : "M"}${x0 + i / ns * 44},${y0 - w[j][i] / pkAmp * 24}`;
+    s.append(sv("path", { d, fill: "none", stroke: t.ch[j] === t.peak ? color : "#888", "stroke-width": 1.2 }));
+  }
+  return s;
+}
+function probeSvg(focus, rings = [], { h = 260 } = {}) {
+  const u0 = unitOf(focus), cp = D.chan_pos, s = sv("svg", { width: "100%", viewBox: `0 0 150 ${h}` });
+  const ymin = u0.y - 300, ymax = u0.y + 300, sx = x => 20 + x / 70 * 120, sy = y => h - 10 - (y - ymin) / (ymax - ymin) * (h - 20);
+  for (const [x, y] of cp) if (y >= ymin && y <= ymax) s.append(sv("rect", { x: sx(x) - 1.5, y: sy(y) - 1.5, width: 3, height: 3, fill: "#dcdcdc" }));
+  const jit = id => ((id % 5) - 2) * 3;
+  for (const id of D.ss_ids) { const u = unitOf(id); if (u.y < ymin || u.y > ymax) continue;
+    s.append(sv("circle", { cx: sx(u.x + jit(id)), cy: sy(u.y), r: 2.6, fill: u.role === "SS_cand" ? "#888" : "#c4c4c4" })); }
+  for (const id of D.cs_ids) { const u = unitOf(id); if (u.y < ymin || u.y > ymax) continue;
+    s.append(sv("circle", { cx: sx(u.x + jit(id)), cy: sy(u.y), r: 2.6, fill: COL.cb, "fill-opacity": 0.55 })); }
+  for (const id of rings) { const u = unitOf(id); if (!u) continue;
+    s.append(sv("circle", { cx: sx(u.x + jit(id)), cy: sy(u.y), r: 5, fill: "none", stroke: "#222", "stroke-width": 1.2 })); }
+  s.append(sv("circle", { cx: sx(u0.x + jit(focus)), cy: sy(u0.y), r: 6, fill: COL.cb, stroke: "#000" }));
+  for (const v of niceTicks(ymin, ymax, 5)) { const t = sv("text", { x: 2, y: sy(v) + 3 }); t.textContent = v; s.append(t); }
+  return s;
+}
+
+// per-unit stable span (reference window always included); falls back to the reference window
+const spanOf = id => { const u = unitOf(id); return u && u.span_start !== undefined && u.span_start !== null ? [u.span_start, u.span_end] : [D.meta.t0, D.meta.t1]; };
+const COL_SPAN = "#e9e2f3";
+// shade() prepends, so the later call ends up behind: reference window first (on top), span second (behind)
+function shadeWin(c, id) { const [s0, s1] = spanOf(id); c.shade(D.meta.t0, D.meta.t1, COL.shade); c.shade(s0, s1, COL_SPAN); return c; }
+// stability of one unit: rate and amplitude per bin relative to its own reference-window values (log2)
+function stabSvg(id, { w = 680, h = 170, color = COL.cb } = {}) {
+  const st = D.stab && D.stab[id];
+  if (!st) return el("div", { class: "note" }, "no stability data");
+  const L = v => v === null || !(v > 0) ? -1.6 : Math.max(-1.6, Math.min(1.6, Math.log2(v)));
+  const c = chart({ w, h, xlim: [0, D.meta.t_rec], ylim: [-1.7, 1.7], xlabel: "time (s, imec)", ylabel: "log2(bin / reference)" });
+  shadeWin(c, id);
+  const fT = Math.log2(P.STAB_FR_TOL), aT = Math.log2(P.STAB_AMP_TOL);
+  c.hline(0, "#bbb", "").hline(fT, color, "2,3").hline(-fT, color, "2,3").hline(aT, "#555", "1,3").hline(-aT, "#555", "1,3");
+  c.vline(D.meta.b0, "#2a9d55", "4,3").vline(D.meta.b1, "#2a9d55", "4,3");
+  for (let i = 0; i < st.t0.length; i++) {
+    const fr = L(st.fr_ratio[i]), am = st.amp_ratio[i] === null ? null : L(st.amp_ratio[i]);
+    c.line([st.t0[i], st.t1[i]], [fr, fr], color, { lw: 2.2 });
+    if (am !== null) c.line([st.t0[i], st.t1[i]], [am, am], "#444", { lw: 1.4 });
+    if (st.in_bhv[i] && !st.ok[i]) c.el.append(sv("rect", { x: c.sx(st.t0[i]), y: c.sy(-1.7) - 5, width: Math.max(1, c.sx(st.t1[i]) - c.sx(st.t0[i]) - 1), height: 4, fill: "#d0453a" }));
+  }
+  c.legend([["firing rate", color], ["amplitude", "#444"], ["behaviour start/end", "#2a9d55"], ["unstable bin", "#d0453a"]]);
+  const [s0, s1] = spanOf(id);
+  return el("div", {}, c.el, el("div", { class: "note" },
+    `stable span [${fmt(s0, 0)}, ${fmt(s1, 0)}] s = ${fmt((s1 - s0) / 60, 1)} min (reference ${fmt((D.meta.t1 - D.meta.t0) / 60, 1)} min, grey; span light purple). ` +
+    `A bin is stable if rate is within ×/÷${P.STAB_FR_TOL} (dotted, colour) and amplitude within ×/÷${P.STAB_AMP_TOL} (dotted, grey); ` +
+    `the span grows outward from the reference window, inside the behaviour period, tolerating ${P.STAB_MAX_GAP} isolated unstable bin.`));
+}
+// templates of a CS pair: a at its spike time (t = 0), b shifted by the measured lag; rows = channels, top of probe first
+function overlaySvg(d, showSum) {
+  const o = d.overlay; if (!o) return el("div", { class: "note" }, "no overlay data");
+  const ns = o.a[0].length, dt = 1e3 / o.sr, t = range(ns, -o.t_zero * dt, dt);
+  const lag = o.lag_ms, lagS = Math.round(lag / dt);
+  const tmin = Math.min(0, lag) + t[0] - 0.1, tmax = Math.max(0, lag) + t[ns - 1] + 0.1;
+  const amp = Math.max(1e-9, ...o.a.concat(o.b).map(r => Math.max(...r) - Math.min(...r)));
+  const W = 680, rowH = 46, ml = 92, mr = 12, mt = 18, H = mt + rowH * o.ch.length + 34;
+  const s = sv("svg", { width: "100%", viewBox: `0 0 ${W} ${H}` });
+  const sx = v => ml + (v - tmin) / (tmax - tmin) * (W - ml - mr);
+  if (o.lag_q_ms) {
+    s.append(sv("rect", { x: sx(o.lag_q_ms[0]), y: mt, width: Math.max(1, sx(o.lag_q_ms[4]) - sx(o.lag_q_ms[0])), height: rowH * o.ch.length, fill: "rgba(51,128,204,0.08)" }));
+    s.append(sv("rect", { x: sx(o.lag_q_ms[1]), y: mt, width: Math.max(1, sx(o.lag_q_ms[3]) - sx(o.lag_q_ms[1])), height: rowH * o.ch.length, fill: "rgba(51,128,204,0.16)" }));
+  }
+  for (const [v, c, lab] of [[0, COL.cb, `${d.cs_a} spike`], [lag, COL.blue, `${d.cs_b} spike (${fmt(lag)} ms)`]]) {
+    s.append(sv("line", { x1: sx(v), x2: sx(v), y1: mt - 4, y2: mt + rowH * o.ch.length, stroke: c, "stroke-dasharray": "3,3" }));
+    const anchor = v === 0 ? (lag > 0 ? "end" : lag < 0 ? "start" : "middle") : (lag > 0 ? "start" : lag < 0 ? "end" : "middle");
+    const tx = sv("text", { x: sx(v), y: mt - 6, "text-anchor": anchor, style: `fill:${c}` }); tx.textContent = lab; s.append(tx);
+  }
+  const path = (x, y, y0) => { let p = ""; for (let i = 0; i < y.length; i++) p += `${i ? "L" : "M"}${sx(x[i])},${y0 - y[i] / amp * rowH * 0.9}`; return p; };
+  o.ch.forEach((ch, j) => {
+    const y0 = mt + rowH * (j + 0.5);
+    const lab = sv("text", { x: 4, y: y0 + 3 }); lab.textContent = `ch ${ch} · y ${o.y[j]}` + (ch === o.peak_a ? " ◆a" : "") + (ch === o.peak_b ? " ◆b" : ""); s.append(lab);
+    s.append(sv("line", { x1: ml, x2: W - mr, y1: y0, y2: y0, stroke: "#eee" }));
+    s.append(sv("path", { d: path(t, o.a[j], y0), fill: "none", stroke: COL.cb, "stroke-width": ch === o.peak_a ? 2 : 1.3 }));
+    s.append(sv("path", { d: path(t.map(v => v + lag), o.b[j], y0), fill: "none", stroke: COL.blue, "stroke-width": ch === o.peak_b ? 2 : 1.3 }));
+    if (showSum) {   // both waveforms summed on the shared sample grid (b shifted by the lag rounded to a sample)
+      const i0 = Math.min(0, lagS), i1 = Math.max(ns, ns + lagS), xs = [], ys = [];
+      for (let i = i0; i < i1; i++) { const va = i >= 0 && i < ns ? o.a[j][i] : 0, k = i - lagS, vb = k >= 0 && k < ns ? o.b[j][k] : 0;
+        xs.push((i - o.t_zero) * dt); ys.push(va + vb); }
+      s.append(sv("path", { d: path(xs, ys, y0), fill: "none", stroke: "#000", "stroke-width": 1, "stroke-dasharray": "3,2" }));
+    }
+  });
+  const yb = mt + rowH * o.ch.length;
+  for (const v of niceTicks(tmin, tmax, 8)) { s.append(sv("line", { x1: sx(v), x2: sx(v), y1: yb, y2: yb + 3, stroke: "#999" }));
+    const tx = sv("text", { x: sx(v), y: yb + 14, "text-anchor": "middle" }); tx.textContent = +v.toFixed(2); s.append(tx); }
+  const xl = sv("text", { x: (ml + W - mr) / 2, y: H - 3, "text-anchor": "middle", class: "muted" }); xl.textContent = `time from ${d.cs_a} spike (ms)`; s.append(xl);
+  return s;
+}
+
+// ---------- sidebar ----------
+function csFlags(cs) {
+  const cands = pairsOfCs(cs).filter(p => p.candidate);
+  return { cands, t1: cands.filter(p => p.ss_tier === 1).length, t2: cands.filter(p => p.ss_tier === 2).length,
+           fam: famOf(cs), dups: dupsOf(cs) };
+}
+function renderList() {
+  const show = document.getElementById("f-show").value, sort = document.getElementById("f-sort").value;
+  let ids = [...D.cs_ids];
+  ids = ids.filter(cs => { const f = csFlags(cs);
+    return show === "all" || (show === "matched" && f.cands.length) || (show === "unmatched" && !f.cands.length)
+      || (show === "family" && f.fam) || (show === "dup" && f.dups.length); });
+  ids.sort((a, b) => sort === "id" ? a - b : unitOf(a).y - unitOf(b).y);
+  const L = document.getElementById("cslist"); L.innerHTML = "";
+  for (const cs of ids) {
+    const u = unitOf(cs), f = csFlags(cs);
+    const badges = [f.t1 ? el("span", { class: "badge t1" }, `SS t1 ×${f.t1}`) : null,
+                    f.t2 ? el("span", { class: "badge t2" }, `SS t2 ×${f.t2}`) : null,
+                    !f.cands.length ? el("span", { class: "badge none" }, "no SS") : null,
+                    f.fam ? el("span", { class: "badge fam" }, `fam ${Math.min(...f.fam)}`) : null,
+                    u.cs_source && u.cs_source !== "C4" ? el("span", { class: "badge raw", title: "v8 CS source" }, u.cs_source) : null,
+                    V8 && pairsOfCs(cs).some(p => p.candidate_lit) ? el("span", { class: "badge t1", title: "v8: >= 1 candidate_lit" }, "lit") : null,
+                    ...(V6 ? decompBadges(cs) : []),
+                    ...(RAW ? rawBadges(cs) : [])];
+    L.append(el("div", { class: "cs-row" + (cs === S.cs ? " on" : ""), onclick: () => go({ cs, ss: null, pair: null }) },
+      el("span", { class: "id" }, cs), el("span", {}, ...badges),
+      el("span", { class: "sub" }, `y ${u.y} µm · ${fmt(u.fr)} sp/s · n ${u.n_spikes}`)));
+  }
+}
+
+// ---------- tabs ----------
+const TABS = { overview: "Overview", pairing: "Pairing", duplicates: "Duplicates", tables: "Tables" };
+const RAW = window.CS_RAW || null;
+// exact time axis (older raw_data.js rounded t_ms to 0.1 ms): rebuild it from the window and the sampling rate
+if (RAW) { const n = RAW.cs[Object.keys(RAW.cs)[0]]?.single?.[0]?.length || RAW.meta.t_ms.length;
+  RAW.meta.t_ms = Array.from({ length: n }, (_, i) => RAW.meta.win_ms[0] + i * 1000 / RAW.meta.fs); }
+if (RAW) TABS.raw = "Raw data";
+function renderTabs() {
+  const T = document.getElementById("tabs"); T.innerHTML = "";
+  for (const [k, lab] of Object.entries(TABS))
+    T.append(el("button", { class: S.tab === k ? "on" : "", onclick: () => go({ tab: k }) }, lab));
+}
+function go(patch) { Object.assign(S, patch); writeHash(); render(); }
+
+function csHeader(cs) {
+  const u = unitOf(cs), f = csFlags(cs);
+  const lines = [
+    `CS ${cs}   C4 ${u.c4_label} conf ${fmt(u.c4_conf, 1)} (${u.c4_votes})   manual CS ${fmt(u.manual_CS)}`,
+    `reference window: n = ${u.n_spikes}, FR = ${fmt(u.fr)} sp/s (full ${fmt(u.fr_full)})   peak ch ${u.peak_ch}, y ${u.y} µm`,
+    `stable span: [${fmt(spanOf(cs)[0], 0)}, ${fmt(spanOf(cs)[1], 0)}] s = ${fmt((spanOf(cs)[1] - spanOf(cs)[0]) / 60, 1)} min, n = ${u.n_spikes_span ?? "–"}   (behaviour [${fmt(D.meta.b0, 0)}, ${fmt(D.meta.b1, 0)}] s)`,
+    `SS partner candidates: ${f.cands.length ? f.cands.map(p => `SS ${p.ss} (t${p.ss_tier} ${p.ss_group}, pr ${fmt(p.pause_ratio)})`).join(", ") : "none"}`,
+    `duplicate family: ${f.fam ? f.fam.join(", ") + "  (not merged)" : "none"}   CS–CS pairs with evidence: ${f.dups.length}`,
+    ...(V8 ? [`v8: source ${u.cs_source || "C4"} · candidate_lit: ${pairsOfCs(cs).filter(p => p.candidate_lit).map(p => p.ss).join(", ") || "none"} · checks: FR ${fmt(u.scr_fr)} Hz ${u.cs_fr_ok ? "✓" : "✗"}, ISI 5–35 ms ${fmt(100 * u.isi_5_35_frac, 1)}% ${u.isi_5_35_ok ? "✓" : "✗"}, < 50 ms ${fmt(100 * u.isi_lt50_frac, 1)}%, CV ${fmt(u.cv)}, CV2 ${fmt(u.cv2)}${u.partial_presence ? " · partial presence" : ""}${u.poor_isolation ? " · poor isolation" : ""}`] : []),
+  ];
+  return el("div", { class: "card wide" }, infoIcon("__header"), el("pre", { class: "card-text" }, lines.join("\n")));
+}
+
+// ---------- Overview ----------
+function renderOverview(M, cs) {
+  const c = D.cs[cs], u = unitOf(cs), g = el("div", { class: "grid" });
+  g.append(csHeader(cs));
+  const nf = c.acg_fine.length;
+  const acgF = chart({ xlim: [-P.ACG_FINE_WIN * 1e3, P.ACG_FINE_WIN * 1e3], ylim: [0, maxOf(c.acg_fine) * 1.1], xlabel: "lag (ms)", ylabel: "rate" });
+  acgF.shade(-5, 5).bars(range(nf, -P.ACG_FINE_WIN * 1e3, P.ACG_FINE_BIN * 1e3), c.acg_fine, P.ACG_FINE_BIN * 1e3, COL.cb);
+  g.append(card("Autocorrelogram (fine, window); grey = ±5 ms", acgF.el));
+  const nc = c.acg_coarse.length;
+  const acgC = chart({ xlim: [-P.ACG_COARSE_WIN * 1e3, P.ACG_COARSE_WIN * 1e3], ylim: [0, maxOf(c.acg_coarse) * 1.1], xlabel: "lag (ms)", ylabel: "rate" });
+  acgC.bars(range(nc, -P.ACG_COARSE_WIN * 1e3, P.ACG_COARSE_BIN * 1e3), c.acg_coarse, P.ACG_COARSE_BIN * 1e3, "#333");
+  g.append(card("Autocorrelogram (coarse, window)", acgC.el));
+  // log-x bars: draw each bin between its own edges
+  const isiSvg = chart({ xlim: [1e-3, 5], ylim: [0, maxOf(c.isi) * 1.1], logx: true, xlabel: "ISI (s)", ylabel: "count" });
+  for (let i = 0; i < c.isi.length; i++) isiSvg.bars([c.isi_edges[i]], [c.isi[i]], c.isi_edges[i + 1] - c.isi_edges[i], "#333");
+  g.append(card(`ISI (window); ${fmt(100 * c.isi_short, 2)}% < ${P.CS_MIN_ISI * 1e3} ms`, isiSvg.el));
+  g.append(card(`Template, peak ch ${u.peak_ch}`, templateSvg(u)));
+  if (V8) g.append(csChecksCard(cs));
+  g.append(card("Probe map (purple CS, dark grey tier-1 SS, light grey tier-2 SS)", probeSvg(cs, [])));
+  const amp = chart({ w: 680, h: 170, xlim: [0, D.meta.t_rec], ylim: [Math.min(0, minOf(c.amp)), maxOf(c.amp) * 1.05], xlabel: "time (s, imec)", ylabel: "amplitude" });
+  shadeWin(amp, cs).dots(c.amp_t, c.amp);
+  g.append(card(`Amplitude across the recording; grey = reference window (${D.meta.window}), light purple = stable span`, amp.el, "span2"));
+  g.append(card(`Stability of CS ${cs} relative to its reference window (60 s bins)`, stabSvg(cs), "span2"));
+  const fr = chart({ w: 680, h: 150, xlim: [0, D.meta.t_rec], ylim: [0, maxOf(c.fr) * 1.1], xlabel: "time (s, imec)", ylabel: "FR (sp/s)" });
+  shadeWin(fr, cs).step(c.fr_t, c.fr, 30, COL.cb);
+  g.append(card("Firing rate, 30 s bins", fr.el, "span2"));
+  if (c.drift) {
+    const dr = chart({ w: 680, h: 130, xlim: [0, D.meta.t_rec], ylim: [minOf(c.drift) - 2, maxOf(c.drift) + 2], xlabel: "time (s, imec)", ylabel: "drift (µm)" });
+    shadeWin(dr, cs).line(c.drift_t, c.drift, COL.cb);
+    g.append(card(`Sorter drift estimate at ${c.drift_depth} µm`, dr.el, "span2"));
+  }
+  M.append(g);
+}
+
+// ---------- Pairing ----------
+// Display-only rankings (2026-11-16); step0's own "rank" column is unchanged.
+// Each criterion: [key, direction (1 = lower is better), label]
+const COMBO = [["pause_ratio", 1, "pause"], ["asym", -1, "asym"], ["jitter_z", 1, "jitter"], ["dist_um", 1, "distance"]];
+function critRanks(ps, k, dir) {        // ss → rank among this CS's SS (1 = best; ties share a rank; missing = last)
+  const v = p => (p[k] === null || p[k] === undefined || Number.isNaN(p[k])) ? Infinity : dir * p[k];
+  const s = ps.map(v).sort((a, b) => a - b);
+  return new Map(ps.map(p => [p.ss, s.indexOf(v(p)) + 1]));
+}
+function comboOf(cs) {                   // A: combined = mean of the per-criterion ranks → ss → {score, rank}
+  const ps = pairsOfCs(cs), rs = COMBO.map(([k, dir]) => critRanks(ps, k, dir));
+  const sc = ps.map(p => [p.ss, rs.reduce((a, r) => a + r.get(p.ss), 0) / rs.length, p.jitter_z ?? 1e9]).sort((a, b) => a[1] - b[1] || a[2] - b[2]);
+  return new Map(sc.map(([ss, score], i) => [ss, { score, rank: i + 1 }]));
+}
+function rankedPairs(cs) {
+  if (S.rank === "combined") { const c = comboOf(cs); return pairsOfCs(cs).sort((a, b) => c.get(a.ss).rank - c.get(b.ss).rank); }
+  const key = { rank: "rank", "jitter z": "jitter_z", "pause ratio": "pause_ratio", distance: "dist_um" }[S.rank];
+  return pairsOfCs(cs).sort((a, b) => (a[key] ?? 1e9) - (b[key] ?? 1e9));
+}
+function shownPairs(cs) {                // B: top N by the chosen ranking + any SS that is #1/#2 on a criterion
+  const ps = rankedPairs(cs);
+  if (!S.topn) return { top: ps, extra: [] };
+  const top = ps.slice(0, S.topn), inTop = new Set(top.map(p => p.ss)), why = new Map();
+  const add = (ss, lab) => { if (!inTop.has(ss)) why.set(ss, [...(why.get(ss) || []), lab]); };
+  for (const [k, dir, lab] of COMBO) { const r = critRanks(ps, k, dir); ps.forEach(p => { if (r.get(p.ss) <= 2) add(p.ss, `#${r.get(p.ss)} ${lab}`); }); }
+  if (RAW) recheckOf(cs).forEach(r => { if (r.post_rank <= 2) add(r.ss, `#${r.post_rank} pause 3–8 raw`); });
+  return { top, extra: ps.filter(p => why.has(p.ss)).map(p => ({ p, why: why.get(p.ss) })) };
+}
+function renderPairing(M, cs) {
+  const { top, extra } = shownPairs(cs), shown = [...top, ...extra.map(x => x.p)], whyOf = new Map(extra.map(x => [x.p.ss, x.why]));
+  const combo = comboOf(cs);
+  if (S.ss === null || !pairOf(cs, S.ss)) S.ss = top.length ? top[0].ss : null;
+  const g = el("div", { class: "grid" }); g.append(csHeader(cs));
+  // controls
+  const sel = (lab, key, opts) => el("label", {}, lab + " ", el("select", { onchange: e => go({ [key]: isNaN(+e.target.value) ? e.target.value : +e.target.value }) },
+    ...opts.map(([v, t]) => { const o = el("option", { value: v }, t); if (String(S[key]) === String(v)) o.selected = true; return o; })));
+  g.append(el("div", { class: "ctl wide" }, sel("rank by", "rank", [["rank", "rank (candidates first)"], ["combined", "combined (pause, asym, jitter, distance)"], ["jitter z", "jitter z"], ["pause ratio", "pause ratio"], ["distance", "distance"]]),
+    sel("show", "topn", [[8, "top 8"], [16, "top 16"], [0, "all"]]), sel("bin", "bin", [[1, "1 ms"], [2, "2 ms"]]),
+    sel("window ±", "win", [[25, "25 ms"], [50, "50 ms"], [100, "100 ms"]]),
+    el("span", { class: "hint" }, "click a table row or a CCG to open its detail below · keys: ", el("kbd", {}, "↑"), el("kbd", {}, "↓"), " CS, ", el("kbd", {}, "←"), el("kbd", {}, "→"), " SS")));
+  // funnel
+  const all = pairsOfCs(cs); let mask = all.map(() => true);
+  const steps = [["all SS candidates", mask.slice()]];
+  for (const [lab, f] of FUNNEL) { mask = mask.map((m, i) => m && f(all[i])); steps.push(["+ " + lab, mask.slice()]); }
+  steps.push(["+ one-to-one (SS claimed by this CS only)", mask.map((m, i) => m && (D.cs_of[all[i].ss] || []).length <= 1)]);
+  const fw = 520, fh = 26 * steps.length + 10, fs = sv("svg", { width: "100%", viewBox: `0 0 ${fw} ${fh}`, style: "max-height:240px" });
+  const nmax = all.length || 1, bx = 230, bw = fw - bx - 110;
+  steps.forEach(([lab, mk], i) => {
+    const n1 = mk.filter((m, j) => m && all[j].ss_tier === 1).length, n2 = mk.filter((m, j) => m && all[j].ss_tier === 2).length;
+    const y = 8 + i * 26, t = sv("text", { x: bx - 6, y: y + 13, "text-anchor": "end" }); t.textContent = lab; fs.append(t);
+    fs.append(sv("rect", { x: bx, y, width: n1 / nmax * bw, height: 18, fill: COL.cb }));
+    fs.append(sv("rect", { x: bx + n1 / nmax * bw, y, width: n2 / nmax * bw, height: 18, fill: COL.t2 }));
+    const c = sv("text", { x: bx + (n1 + n2) / nmax * bw + 4, y: y + 13 }); c.textContent = `${n1 + n2}  (t1 ${n1}, t2 ${n2})`; fs.append(c);
+  });
+  g.append(card("Pairing funnel: SS candidates passing the criteria cumulatively (purple tier 1, grey tier 2)", fs, "span2"));
+  // criteria table
+  const tb = el("table");
+  tb.append(el("tr", {}, el("th", {}, "SS"), el("th", {}, "tier"), el("th", {}, "group"), el("th", {}, "C4"), el("th", {}, "d µm"),
+    ...GRID.map(c => el("th", { style: c.crit ? "" : "color:#888;font-weight:400" }, c.h)), el("th", {}, "claimed by"),
+    el("th", { title: "candidate in the reference window alone (win_selected); red = decision differs from the stable-span window" }, "ref ★"), el("th", {}, "pair window s"),
+    ...(RAW ? [el("th", { title: "raw layer: pause ratio 3–8 ms, after the CS event window (information only)" }, "pr 3–8 ⓘ")] : []),
+    el("th", { title: "combined rank: mean of this SS's ranks on pause, asym, jitter z and distance among this CS's SS (information only)" }, "combined #")));
+  const rcx = RAW ? Object.fromEntries(recheckOf(cs).map(r => [r.ss, r])) : {};
+  const ncol = 9 + GRID.length + (RAW ? 1 : 0);
+  const addRow = p => {
+    const why = whyOf.get(p.ss), cb = combo.get(p.ss);
+    const tr = el("tr", { class: "click" + (p.ss === S.ss ? " sel" : ""), onclick: () => go({ ss: p.ss }) },
+      el("td", {}, `${p.ss}${p.candidate ? " ★" : ""}`, ...(why ? [" ", ...why.map(w => el("span", { class: "badge raw", title: "outside the top N, shown because it ranks this high on that criterion" }, w))] : [])),
+      el("td", {}, p.ss_tier), el("td", {}, p.ss_group), el("td", {}, p.ss_c4), el("td", {}, fmt(p.dist_um, 0)),
+      ...GRID.map(c => { const v = p[c.k], ok = v !== null && c.ok(v);
+        return el("td", { class: (c.crit ? "" : "info ") + (v === null ? "zero" : ok ? "plus" : "minus") }, fmt(v, c.nd ?? 2)); }),
+      el("td", {}, (D.cs_of[p.ss] || []).join(", ") || "–"),
+      el("td", { class: p.candidate_ref === p.candidate ? "" : "minus", title: `reference: pr ${fmt(p.pause_ratio_ref)}, asym ${fmt(p.asym_ref)}, p ${fmt(p.jitter_p_ref, 3)}, n CS ${p.n_cs_ref}` }, p.candidate_ref ? "★" : "–"),
+      el("td", {}, `${fmt(p.win_start, 0)}–${fmt(p.win_end, 0)}`),
+      ...(RAW ? [(() => { const r = rcx[p.ss], v = r ? r.pr_3_8 : null;
+        return el("td", { class: "info " + (v === null ? "zero" : v < P.CAND_PAUSE_RATIO_MAX ? "plus" : "minus") }, r ? `${fmt(v)} (#${r.post_rank})` : "–"); })()] : []),
+      el("td", { class: "info", title: `mean rank ${fmt(cb.score, 1)} over ${COMBO.map(c => c[2]).join(", ")}` }, `#${cb.rank}`));
+    tb.append(tr);
+  };
+  top.forEach(addRow);
+  if (extra.length) {
+    tb.append(el("tr", {}, el("td", { colspan: ncol, class: "note", style: "background:#f4f7fb" },
+      `Outside the top ${S.topn}, shown because they rank #1 or #2 on one criterion:`)));
+    extra.forEach(x => addRow(x.p));
+  }
+  g.append(card("Criteria per SS (★ candidate = first four all pass; grey headers are information only)",
+    el("div", { class: "table-wrap" }, tb), "wide"));
+  if (V6) { g.append(decompCard(cs)); const lf = lowfrCard(cs); if (lf) g.append(lf); }
+  // CCG grid
+  const cg = el("div", { class: "ccgs" });
+  shown.forEach(p => {
+    const y = cropRebin(p.ccg, S.bin, S.win);
+    const cell = el("div", { class: "ccg-cell" + (p.candidate ? " cand" : "") + (p.ss === S.ss ? " sel" : ""), onclick: () => go({ ss: p.ss }) },
+      el("div", { class: "t" }, `${whyOf.has(p.ss) ? "[" + whyOf.get(p.ss).join(", ") + "] " : ""}SS ${p.ss} t${p.ss_tier} (${p.ss_c4}) ${fmt(p.dist_um, 0)} µm · pr ${fmt(p.pause_ratio)} asym ${fmt(p.asym)} p ${fmt(p.jitter_p, 3)}`),
+      ccgChart(y, S.bin * 1e-3, S.win * 1e-3, { h: 130 }));
+    cg.append(cell);
+  });
+  g.append(card(`CCGs: SS with respect to CS ${cs} (shaded: pause window, light: baseline)`, cg, "wide"));
+  { const ec = ephapticCard(cs); if (ec) g.append(ec); }
+  { const sc = sameCellCard(cs); if (sc) g.append(sc); }
+  if (S.ss !== null) renderPairDetail(g, cs, S.ss);
+  M.append(g);
+}
+function renderPairDetail(g, cs, ss) {
+  const p = pairOf(cs, ss), u = unitOf(ss);
+  const checks = GRID.map(c => `${c.h} ${p[c.k] !== null && c.ok(p[c.k]) ? "✓" : "✗"} (${fmt(p[c.k], c.nd ?? 2)})`).join("   ");
+  g.append(el("div", { class: "card wide" }, infoIcon("Detail: CS"), el("h3", {}, `Detail: CS ${cs} → SS ${ss}  (tier ${p.ss_tier}, ${p.ss_group}, C4 ${p.ss_c4}, ${fmt(p.ss_fr, 1)} sp/s, d ${fmt(p.dist_um, 0)} µm) — candidate: ${p.candidate}`),
+    el("div", { class: "note" }, checks),
+    el("div", { class: "note" }, `pair window [${fmt(p.win_start, 0)}, ${fmt(p.win_end, 0)}] s = ${fmt((p.win_end - p.win_start) / 60, 1)} min (overlap of both stable spans), n CS ${p.n_cs}, n SS ${p.n_ss} · reference window: n CS ${p.n_cs_ref}, pause ${fmt(p.pause_ratio_ref)}, asym ${fmt(p.asym_ref)}, jitter p ${fmt(p.jitter_p_ref, 3)} → candidate ${p.candidate_ref}`),
+    el("div", { class: "note", style: p.cs_share_flag ? "color:#b3261e;font-weight:600" : "" },
+      `CS-spike sharing: ${fmt(100 * p.cs_share_frac, 0)}% of CS spikes have an SS spike within ±${P.ZERO_WIN[1] * 1e3} ms ` +
+      `(chance ${fmt(100 * p.cs_share_null, 0)}%, excess ${fmt(100 * p.cs_share_excess, 0)}%); ` +
+      `${fmt(100 * p.ss_from_cs_frac, 1)}% of this unit's spikes sit on a CS` +
+      (p.cs_share_flag ? ` — FLAG (> ${fmt(100 * P.CS_SHARE_FLAG, 0)}%): this "SS" may carry CS spikes or spikelets; flag only, candidate unchanged` : "")),
+    ...(V6 ? [el("div", { class: "note", style: p.cs_event_flag ? "color:#b3261e;font-weight:600" : "" },
+      `CS event (${P.EVENT_WIN[0] * 1e3}…+${P.EVENT_WIN[1] * 1e3} ms): ${fmt(100 * p.cs_event_excess, 0)}% of CS events carry a spike of this unit beyond chance; ` +
+      `${fmt(100 * p.ss_cs_locked_frac, 1)}% of its spikes are CS-locked` +
+      (p.cs_event_flag ? ` — FLAG (> ${fmt(100 * P.CS_EVENT_FLAG, 0)}%): carries pieces of the CS event; the pause (${P.PAUSE_WIN[0] * 1e3}–${P.PAUSE_WIN[1] * 1e3} ms) is measured after them` : "")),
+      el("div", { class: "note" }, `v5 window (0–8 ms, still inside the CS event): pause ${fmt(p.pause_ratio_0_8)}, asym ${fmt(p.asym_0_8)}`)] : []),
+    el("div", { class: "note" }, `pause minimum at ${fmt(p.pause_min_lag_ms, 0)} ms, recovery 50% ${fmt(p.pause_dur50_ms, 0)} ms / 80% ${fmt(p.pause_dur80_ms, 0)} ms, jitter z ${fmt(p.jitter_z, 1)}, deficit ${fmt(p.jitter_deficit)}, baseline ${fmt(p.baseline_rate, 1)} sp/s`)));
+  { const pf = pauseFigureCard(cs, ss); if (pf) g.append(pf); const ro = rawOverlayCard(cs, ss); if (ro) g.append(ro); const pz = PF ? pauseZoomCard(cs, ss) : null; if (pz) g.append(pz); }
+  if (V8) { const lc = latencyCard(p); if (lc) g.append(lc); const rc = refrCard(p); if (rc) g.append(rc); }
+  g.append(card("Coarse CCG ±50 ms, 1 ms", ccgChart(cropRebin(p.ccg, 1, 50), 1e-3, 50e-3)));
+  if (p.fine) g.append(card("Fine CCG ±10 ms, 0.1 ms (zero-lag peak, collision dip)",
+    ccgChart(p.fine, P.FINE_BIN, P.FINE_WIN, { shadePause: false, vlines: [0] })));
+  else g.append(card("Fine CCG", el("div", { class: "note" }, "exported only for candidates and top-ranked SS")));
+  const a = D.ss_acg[ss];
+  const ac = chart({ xlim: [-P.ACG_FINE_WIN * 1e3, P.ACG_FINE_WIN * 1e3], ylim: [0, maxOf(a) * 1.1], xlabel: "lag (ms)", ylabel: "rate" });
+  ac.bars(range(a.length, -P.ACG_FINE_WIN * 1e3, P.ACG_FINE_BIN * 1e3), a, P.ACG_FINE_BIN * 1e3, "#555");
+  g.append(card(`Autocorrelogram SS ${ss}`, ac.el));
+  g.append(card(`Template SS ${ss}, peak ch ${u.peak_ch}`, templateSvg(u, "#333")));
+  const bl = (p.block_pause_ratios || "").split(";").map(Number).filter(v => isFinite(v));
+  const bt = bl.map((_, i) => ((p.win_start ?? D.meta.t0) + i * P.BLOCK_LEN) / 60);
+  const bc = chart({ xlim: [Math.min(...bt, 0) - 1, Math.max(...bt, 1) + 1], ylim: [0, Math.max(1.2, maxOf(bl) * 1.1)], xlabel: "block start (min)", ylabel: "pause ratio" });
+  bc.hline(1).hline(P.CAND_PAUSE_RATIO_MAX, "#bbb", "1,3").line(bt, bl, COL.cb, { lw: 1.6 }).dots(bt, bl, COL.cb, 3);
+  g.append(card(`Per-block pause ratio (${P.BLOCK_LEN / 60} min blocks)`, bc.el));
+  if (p.blocks) {
+    const n = p.blocks.find(b => b)?.length || 0, ys = p.blocks.filter(Boolean).flat();
+    const pc = chart({ xlim: [-P.COARSE_WIN * 1e3, P.COARSE_WIN * 1e3], ylim: [0, maxOf(ys) * 1.08], xlabel: "time lag (ms)", ylabel: "rate" });
+    pc.shade(P.PAUSE_WIN[0] * 1e3, P.PAUSE_WIN[1] * 1e3);
+    const hue = i => `hsl(${260 - i * 40}, 55%, ${35 + i * 6}%)`, leg = [];
+    p.blocks.forEach((b, i) => { if (!b) return; pc.step(range(n, -P.COARSE_WIN * 1e3, P.COARSE_BIN * 1e3), b, P.COARSE_BIN * 1e3, hue(i), { lw: 1 });
+      leg.push([`${Math.round(p.block_t0[i] / 60)}′`, hue(i)]); });
+    pc.legend(leg);
+    g.append(card("Per-block CCGs", pc.el));
+  }
+  g.append(card("Probe map (ringed: this SS)", probeSvg(cs, [ss])));
+  if (RAW && RAW.units[ss]) g.append(card(`Raw data: mean waveform of SS ${ss}, −2…+8 ms (n ${RAW.units[ss].n})`, probeTraceSvg(RAW.units[ss], "#333"), "span2"));
+  if (RAW && RAW.locked[ss]) g.append(card(`Raw data: SS ${ss}'s CS-locked spikes vs its other spikes`, lockedSvg(ss), "span2",
+    `${RAW.locked[ss].n_locked} of ${RAW.locked[ss].n_locked + RAW.locked[ss].n_other} spikes (${fmt(100 * RAW.locked[ss].frac_locked, 1)}%) fall ${RAW.meta.capture_win_ms[0]}…+${RAW.meta.capture_win_ms[1]} ms after a CS whose event it captures. Different shapes → these spikes are CS pieces, not this unit's own spikes.`));
+  g.append(card(`Stability of SS ${ss} relative to its reference window`, stabSvg(ss, { color: "#555" }), "span2"));
+  g.append(card(`Stability of CS ${cs}`, stabSvg(cs), "span2"));
+}
+
+// ---------- v8: literature metrics (step0 v8) ----------
+function csChecksCard(cs) {
+  const u = unitOf(cs), row = (V8.cs || []).find(r => r.phyID === cs) || {};
+  const L = [`source: ${u.cs_source || "C4"} (C4 ${u.cs_c4 ? "y" : "n"}, manual ${u.cs_manual ? "y" : "n"}, screen ${u.cs_screen ? "y" : "n"}) · C4 label ${u.c4_label ?? "unlabelled"} · extra-good ${fmt(u.extragood)}`,
+    `FR (span) ${fmt(u.scr_fr)} Hz  ${u.cs_fr_ok ? "✓" : "✗"} (${P.CS_FR_RANGE[0]}–${P.CS_FR_RANGE[1]} Hz)`,
+    `ISIs ${ms(P.CS_ISI_5_35[0])}–${ms(P.CS_ISI_5_35[1])} ms: ${fmt(100 * u.isi_5_35_frac, 1)}%  ${u.isi_5_35_ok ? "✓" : "✗"} (< ${100 * P.CS_ISI_5_35_MAX}%) · code v1 ${ms(P.CS_ISI_10_35[0])}–${ms(P.CS_ISI_10_35[1])} ms ÷ spikes: ${fmt(100 * u.cs_isi_10_35_frac, 1)}%`,
+    `ISIs < ${ms(P.CS_MIN_IOI)} ms: ${fmt(100 * u.isi_lt50_frac, 2)}% · CV ${fmt(u.cv)} (ref ${P.CS_CV_REF}) · CV2 ${fmt(u.cv2)} (ref ${P.CS_CV2_REF})`,
+    `presence: ${fmt(100 * u.presence_bins_frac, 0)}% of ${P.PRESENCE_BIN} s bins${u.partial_presence ? "  ⚠ partial presence" : ""} · isolation${u.poor_isolation ? " ⚠ poor" : " ok"} (ISI < 1 ms ${fmt(100 * u.frac_isi_lt1ms, 2)}%)`,
+    `template: duration ${fmt(u.tmpl_dur_ms)} ms, footprint ${u.tmpl_n_fp_ch} ch, late peaks ${u.tmpl_n_late_peaks}`,
+    ...(row.dup_or_piece_of_c4 ? [`duplicate / piece of C4 CS: ${row.dup_or_piece_of_c4}`] : []),
+    ...(row.recovered_cs ? ["RECOVERED CS (pairs, not a duplicate or piece of a C4 CS)"] : [])];
+  return card("CS unit checks (v8)", el("pre", { class: "card-text" }, L.join("\n")));
+}
+function latencyCard(p) {
+  if (!p.lat_post_hist) return null;
+  const e = V8.lat_edges_ms, x = e.slice(0, -1), bw = e[1] - e[0];
+  const n1 = p.lat_post_hist.reduce((a, b) => a + b, 0) || 1, n0 = p.lat_pre_hist.reduce((a, b) => a + b, 0) || 1;
+  const yp = p.lat_post_hist.map(v => v / n1), yq = p.lat_pre_hist.map(v => v / n0);
+  const c = chart({ h: 170, xlim: [0, e[e.length - 1]], ylim: [0, Math.max(maxOf(yp), maxOf(yq)) * 1.1], xlabel: "latency (ms)", ylabel: "share of CS" });
+  c.step(x, yq, bw, "#888", { lw: 1.4 }).step(x, yp, bw, COL.cb, { lw: 1.6 }).vline(p.lat_post_med_ms, COL.cb).vline(p.lat_pre_med_ms, "#888");
+  c.legend([["after CS (L_post)", COL.cb], ["before CS (L_pre)", "#888"]]);
+  return card(`Latency test: CS ${p.cs} → SS ${p.ss}`, el("div", {}, c.el, el("div", { class: "note" },
+    `median after ${fmt(p.lat_post_med_ms, 1)} ms vs before ${fmt(p.lat_pre_med_ms, 1)} ms (ratio ${fmt(p.lat_ratio)}), one-sided Mann-Whitney p ${fmt(p.lat_p, 4)}, Cliff ${fmt(p.lat_cliff)} (n ${p.lat_n}) · SS median ISI ${fmt(p.ss_isi_med_ms, 1)} ms → dur50 = ${fmt(p.pause_isi_units)} ISI, L_post = ${fmt(p.lpost_isi_units)} ISI · candidate_lit ${p.candidate_lit ? "★" : "–"}`)));
+}
+function refrCard(p) {
+  if (!p.acg_refr || !p.ccg) return null;
+  const half = V8.refr_win_ms, n = p.acg_refr.length, xa = range(n, -half, 1);
+  const W = P.HTML_CCG_WIN * 1e3, i0 = Math.round(W - half), cc = p.ccg.slice(i0, i0 + n);
+  const mean = p.n_ss / Math.max(1e-9, p.win_end - p.win_start), yc = cc.map(v => v / mean), ya = p.acg_refr.map(v => v / mean);
+  const c = chart({ h: 170, xlim: [-half, half], ylim: [0, Math.max(2, maxOf(ya.concat(yc)) * 1.05)], xlabel: "lag (ms)", ylabel: "rate ÷ mean SS rate" });
+  c.shade(P.PAUSE_WIN[0] * 1e3, P.PAUSE_WIN[1] * 1e3).step(xa, ya, 1, "#888", { lw: 1.4 }).step(xa, yc, 1, COL.cb, { lw: 1.6 }).hline(1).vline(0, "#bbb");
+  c.legend([["SS|CS", COL.cb], ["SS|SS (ACG)", "#888"]]);
+  return card(`SS|CS vs SS|SS: CS ${p.cs} → SS ${p.ss}`, el("div", {}, c.el, el("div", { class: "note" },
+    `refr ratio ${fmt(p.refr_ratio)} (< ${P.LIT_REFR_RATIO_MAX} = pause beyond refractoriness) · SS|CS below SS|SS for ${fmt(p.below_refr_ms, 0)} ms after ${ms(P.PAUSE_WIN[0])} ms · Lussac paper v1 ${p.lussac_paper_v1_pass ? "✓" : "✗"}, code main ${p.lussac_code_main_pass ? "✓" : "✗"}${p.lussac_code_main_fr_ok ? "" : " (FR gates not met)"}`)));
+}
+function v8TablesCards(g, cs) {
+  const dist = V8.dist || [];
+  g.append(card("Spatial check: distance of pairs, depth offset and false-positive rates (> " + P.FP_UM + " µm)",
+    sortableTable(dist, ["group", "n", "med_um", "q25_um", "q75_um", "le50", "le100", "le200", "gt500", "dy_pos_share", "n_strong", "strong_dy_pos_share"]), "wide"));
+  g.append(card("CS by source (v8): checks, pairing, duplicate / piece of a C4 CS, recovered", sortableTable(V8.cs || [],
+    ["phyID", "cs_source", "c4_label", "extragood", "scr_fr", "cs_fr_ok", "isi_5_35_frac", "isi_lt50_frac", "cv", "cv2", "partial_presence", "poor_isolation",
+     "n_candidate", "n_candidate_lit", "dup_or_piece_of_c4", "recovered_cs", "fails"], { onRow: r => go({ tab: "pairing", cs: r.phyID }) }), "wide"));
+  const sc = (V8.screen || []).filter(r => !S.tcand || r.screen_pass || r.manual_CS);
+  g.append(card(`Screen: C4-unlabelled pool + calibration on C4-labelled units (${sc.length} rows; "candidates only" = passing or manual)`, el("div", {},
+    el("pre", { class: "card-text" }, "calibration (share passing): " + (V8.calib || []).map(r => `${r.c4} ${fmt(100 * r.pass_share, 0)}% of ${r.n}`).join(" · ")
+      + "\nmanual flag × screen pass: " + Object.entries(V8.agree || {}).map(([k, v]) => `${k}: ${v}`).join(" · ")),
+    sortableTable(sc, ["phyID", "pool", "c4_label", "manual_CS", "role", "cs_source", "scr_fr", "cs_fr_ok", "isi_5_35_frac", "isi_5_35_ok", "cs_isi_10_35_frac",
+      "isi_lt50_frac", "cv", "cv2", "screen_pass", "partial_presence", "poor_isolation", "tmpl_dur_ms", "tmpl_n_fp_ch", "tmpl_n_late_peaks"])), "wide"));
+  if ((V8.kept || []).length) g.append(card("Manual flag, kept as SS (option A)", sortableTable(V8.kept,
+    ["unit", "role", "fr", "c4_label", "extragood", "manual", "screen_pass", "best_cs", "best_pause_ratio", "best_candidate", "best_candidate_lit", "n_candidate_as_ss"]), "wide"));
+}
+
+// ---------- Pause figure + ephaptic check (pause_figure_data.py; after Han, Chen et al. 2020 Nat Neurosci 23:1399, Fig. 1 & 8c) ----------
+const PF = window.CS_PAUSEFIG || null;
+const pfPair = (cs, ss) => PF && PF.pairs[`${cs}_${ss}`];
+const PF_XL = [-5, 20];                                    // display range (ms), as in the paper
+const GROUP_COL = ["#b3261e", "#e08a2c", "#3380cc", "#8c8c8c"];
+function tmplTrace(id) {                                   // sorter template on the unit's peak channel (ms, a.u.)
+  const u = unitOf(id); if (!u || !u.template) return null;
+  const t = u.template, row = t.w[t.ch.indexOf(t.peak)]; if (!row) return null;
+  const sr = (P.SR || 30000) / 1000, z = P.T_ZERO_SAMPLE ?? 40;
+  return { t: row.map((_, i) => (i - z) / sr), y: row };
+}
+function tmplChart(id, xlim, { h = 70, color = COL.cb } = {}) {
+  const tr = tmplTrace(id); if (!tr) return el("div", { class: "note" }, "no template");
+  const lo = minOf(tr.y), hi = maxOf(tr.y), c = chart({ h, xlim, ylim: [lo * 1.1, hi * 1.1 || 1], ylabel: "tmpl" });
+  c.line(tr.t, tr.y, color, { lw: 1.4 }).vline(0, "#bbb"); return c.el;
+}
+function pfLeft(f, t0) { return range(f.length, t0, PF.bin_ms); }
+function pfNormChart(f, { h = 110, xlim = PF_XL, color = "#333", key = "psth", t0 = PF.psth_t0_ms, bin = PF.bin_ms, ylim = null, label = "rate ÷ baseline" } = {}) {
+  const y = f[key], x = range(y.length, t0, bin), xc = x.map(v => v + bin / 2);
+  const top = ylim ? ylim[1] : Math.max(1.5, maxOf(f[key + "_hi"] || y) * 1.05);
+  const c = chart({ h, xlim, ylim: ylim || [0, top], xlabel: "time from CS (ms)", ylabel: label });
+  c.shade(PF.early_win_ms[0], PF.early_win_ms[1], "#f6e3e1").shade(PF.pause_win_ms[0], PF.pause_win_ms[1]);
+  if (f[key + "_lo"]) c.band(xc, f[key + "_lo"], f[key + "_hi"], "#888", 0.35);
+  c.line(xc, y, color, { lw: 1.5 }).hline(1).vline(0, "#bbb");
+  return c.el;
+}
+function pauseFigureCard(cs, ss) {
+  if (!PF) return null;
+  const f = pfPair(cs, ss);
+  if (!f) return card("Pause figure", el("div", { class: "note" }, "Not exported for this pair (exported: candidates, step0 top 8, combined top 8, the #1/#2 SS on each criterion, and the control SS)."), "wide");
+  const opts = Object.keys(PF.pairs).filter(k => k.startsWith(cs + "_")).map(k => +k.split("_")[1]).filter(s => s !== ss)
+    .sort((a, b) => PF.pairs[`${cs}_${a}`].dist_um - PF.pairs[`${cs}_${b}`].dist_um);
+  const ctrl = S.ctrl !== null && opts.includes(S.ctrl) ? S.ctrl : opts.includes(PF.control[cs]) ? PF.control[cs] : opts[0];
+  const fc = ctrl !== undefined ? pfPair(cs, ctrl) : null, pc = ctrl !== undefined ? pairOf(cs, ctrl) : null;
+  const ctl = el("label", {}, "control SS ", el("select", { onchange: e => go({ ctrl: +e.target.value }) },
+    ...opts.map(s => { const q = pairOf(cs, s), o = el("option", { value: s },
+      `${s} · ${fmt(PF.pairs[`${cs}_${s}`].dist_um, 0)} µm${q && q.candidate ? " ★" : ""}${s === PF.control[cs] ? " (default: nearest non-partner)" : ""}`);
+      if (s === ctrl) o.selected = true; return o; })));
+  // left column: this CS → SS
+  const L = el("div", {});
+  const lab = t => el("div", { class: "note", style: "margin:4px 0 0;font-weight:600" }, t);
+  L.append(lab(`aa · CS ${cs} template (peak channel)`), tmplChart(cs, PF_XL));
+  const rc = chart({ h: 150, xlim: PF_XL, ylim: [0, f.raster.length + 1], xlabel: "time from CS (ms)", ylabel: "CS event" });
+  const rx = [], ry = []; f.raster.forEach((row, i) => row.forEach(v => { rx.push(v / 10); ry.push(i + 1); }));
+  rc.shade(PF.pause_win_ms[0], PF.pause_win_ms[1]).ticks(rx, ry, "#222").vline(0, "#b3261e", "");
+  L.append(lab(`ac · raster, ${f.raster.length} random CS events (of ${f.n_cs}), time order`), rc.el);
+  const hz = f.psth.map(v => v * f.base_hz), x = range(hz.length, PF.psth_t0_ms, PF.bin_ms);
+  const hc = chart({ h: 100, xlim: PF_XL, ylim: [0, maxOf(hz) * 1.08], xlabel: "time from CS (ms)", ylabel: "SS sp/s" });
+  hc.bars(x, hz, PF.bin_ms, COL.cb).hline(f.base_hz).vline(0, "#bbb");
+  L.append(lab(`ad · SS ${ss} rate, ${PF.bin_ms} ms bins (dashed: baseline ${fmt(f.base_hz, 1)} sp/s)`), hc.el);
+  L.append(lab(`ae · ÷ baseline, 95% band (${PF.n_boot} resamples of the CS events)`), pfNormChart(f, { color: COL.cb }));
+  // right: quarters of the pair window, this SS and the control
+  const qmax = Math.min(2.5, Math.max(1.5, ...[f, fc].filter(Boolean).flatMap(z => z.quarters.flatMap(q => q.psth ? q.psth.filter(v => v !== null && isFinite(v)) : []))));   // capped: a CS-locked spike bin would flatten the rest
+  const R = el("div", { style: "display:grid;grid-template-columns:1fr 1fr;gap:2px 8px;align-content:start" },
+    el("div", { class: "note", style: "font-weight:600" }, `SS ${ss} (this pair)`),
+    el("div", { class: "note", style: "font-weight:600" }, fc ? `control SS ${ctrl}, ${fmt(fc.dist_um, 0)} µm${pc && pc.candidate ? " ★" : ""}` : "no control SS exported"));
+  for (let qi = 0; qi < 4; qi++) {
+    for (const [z, color] of [[f, COL.cb], [fc, "#777"]]) {
+      if (!z) { R.append(el("div")); continue; }
+      const q = z.quarters[qi], box = el("div", {});
+      box.append(el("div", { class: "note", style: "margin:0" }, `${"abcd"[qi]} · ${fmt(q.t[0] / 60, 0)}–${fmt(q.t[1] / 60, 0)} min, n CS ${q.n_cs}, base ${fmt(q.base_hz, 0)} sp/s`));
+      if (q.psth) { const c = chart({ h: 95, xlim: PF_XL, ylim: [0, qmax * 1.05], ylabel: "÷ base" });
+        c.shade(PF.pause_win_ms[0], PF.pause_win_ms[1]).bars(range(q.psth.length, PF.psth_t0_ms, PF.bin_ms), q.psth, PF.bin_ms, color).hline(1).vline(0, "#bbb");
+        box.append(c.el); } else box.append(el("div", { class: "note" }, "no CS events / baseline"));
+      R.append(box);
+    }
+  }
+  return el("div", { class: "card wide" }, infoIcon("Pause figure"),
+    el("h3", {}, `Pause figure: CS ${cs} → SS ${ss}`), el("div", { class: "ctl" }, ctl),
+    el("div", { class: "note" }, `Pair window ${fmt(f.quarters[0].t[0], 0)}–${fmt(f.quarters[3].t[1], 0)} s. Shading: red ${PF.early_win_ms[0]}–${PF.early_win_ms[1]} ms (where neighbouring PCs are briefly suppressed), grey ${PF.pause_win_ms[0]}–${PF.pause_win_ms[1]} ms (step0 pause window). Raw sweeps: see Raw CS overlay (sessions with a raw file).`),
+    el("div", { style: "display:grid;grid-template-columns:minmax(260px,1.1fr) minmax(320px,1.4fr);gap:12px" }, L, R));
+}
+// ---------- Raw CS overlay (raw_cs_overlay.py → ../raw_overlay/raw_overlay.js) ----------
+const RO = window.CS_RAWOVERLAY || null;
+function rawOverlayCard(cs, ss) {
+  if (!RO) return null;
+  const c = RO.cs[cs];
+  if (!c) return card("Raw CS overlay", el("div", { class: "note" }, `No raw sweeps for CS ${cs} (exported only for CS with a partner or a step0 #1 SS).`), "wide");
+  const s = c.ss[ss];
+  if (!s) return card("Raw CS overlay", el("div", { class: "note" }, `Raw sweeps of CS ${cs} exist for SS ${Object.keys(c.ss).join(", ")} only (partners / step0 #1 and the control SS).`), "wide");
+  const t = c.traces[c.ch][0].map((_, i) => RO.t0_ms + i * RO.dt_ms), xl = [RO.t0_ms, RO.t0_ms + t.length * RO.dt_ms];
+  const panel = (ch, title) => {
+    const tr = c.traces[ch], all = tr.flat(), lo = Math.max(minOf(all), -600), hi = Math.min(maxOf(all), 400);
+    const mean = t.map((_, i) => tr.reduce((a, r) => a + r[i], 0) / tr.length);
+    const ch1 = chart({ h: 190, xlim: xl, ylim: [lo, hi], ylabel: "µV" });
+    ch1.shade(P.PAUSE_WIN[0] * 1e3, P.PAUSE_WIN[1] * 1e3);
+    tr.forEach(r => ch1.line(t, r, "#000", { lw: 0.5, op: 0.18 }));
+    ch1.line(t, mean, "#b3261e", { lw: 1.3 }).vline(0, "#b3261e");
+    const rc = chart({ h: 100, xlim: xl, ylim: [0, tr.length + 1], xlabel: "time from CS (ms)", ylabel: "sweep" });
+    const rx = [], ry = [], cx = [], cy = [];
+    s.ticks.forEach((row, i) => row.forEach(v => { rx.push(v / 10); ry.push(i + 1); }));
+    c.cs_ticks.forEach((row, i) => row.forEach(v => { cx.push(v / 10); cy.push(i + 1); }));
+    rc.shade(P.PAUSE_WIN[0] * 1e3, P.PAUSE_WIN[1] * 1e3).ticks(rx, ry, "#222").ticks(cx, cy, "#b3261e");
+    return el("div", {}, el("div", { class: "note", style: "font-weight:600;margin:0" }, title), ch1.el, rc.el);
+  };
+  const kind = s.control ? "control SS" : s.partner ? "partner ★" : "step0 #" + s.rank + ", not a candidate";
+  const cols = [panel(String(c.ch), `ch ${c.ch} · CS ${cs} peak channel`)];
+  if (s.ch !== c.ch) cols.push(panel(String(s.ch), `ch ${s.ch} · SS ${ss} peak channel`));
+  else cols[0].firstChild.textContent += ` (also SS ${ss}'s peak channel)`;
+  return el("div", { class: "card wide" }, infoIcon("Raw CS overlay"),
+    el("h3", {}, `Raw CS overlay: CS ${cs}, SS ${ss} (${kind}, ${fmt(s.dist_um, 0)} µm)`),
+    el("div", { class: "note" }, `${c.t_ev.length} random CS events of ${c.n_cs_win} in ${fmt(c.win[0], 0)}–${fmt(c.win[1], 0)} s, ${RO.hp_hz}–${RO.lp_hz} Hz, from the ${RO.raw_where}. Grey: step0 pause window.`),
+    el("div", { style: `display:grid;grid-template-columns:repeat(${cols.length},minmax(260px,1fr));gap:12px` }, ...cols));
+}
+function pauseZoomCard(cs, ss) {
+  const f = pfPair(cs, ss); if (!f || !f.zoom) return null;
+  const xl = [PF.zoom_t0_ms, PF.zoom_t0_ms + f.zoom.length * PF.zbin_ms], b = el("div", {});
+  b.append(tmplChart(cs, xl, { h: 80 }));
+  b.append(pfNormChart(f, { key: "zoom", t0: PF.zoom_t0_ms, bin: PF.zbin_ms, xlim: xl, color: COL.cb, h: 130 }));
+  return card(`Pause onset: CS ${cs} template over SS ${ss}, ${PF.zbin_ms} ms bins`, b);
+}
+function ephapticCard(cs) {
+  if (!PF) return null;
+  const E = PF.eph, idx = E.cs.map((c, i) => c === cs ? i : -1).filter(i => i >= 0);
+  if (!idx.length) return null;
+  const XM = 300, beyond = idx.filter(i => E.d[i] > XM);
+  const scatter = (key, ylab) => {
+    const ys = idx.map(i => E[key][i]), c = chart({ h: 170, xlim: [0, XM], ylim: [0, Math.max(1.5, Math.min(3, maxOf(ys) * 1.05))], xlabel: "distance CS–SS peak channels (µm)", ylabel: ylab });
+    [25, 50, 75].forEach(v => c.vline(v, "#ccc")); c.hline(1);
+    const grp = (f, color, r) => { const k = idx.filter(f); c.dots(k.map(i => E.d[i]), k.map(i => E[key][i]), color, r); };
+    grp(i => !E.partner[i] && !E.flagged[i], "rgba(80,80,80,.55)", 2.2);
+    grp(i => E.flagged[i], "#e08a2c", 3);
+    grp(i => E.partner[i], COL.cb, 4);
+    idx.filter(i => E.ss[i] === S.ss && E.d[i] <= XM).forEach(i => c.el.append(sv("circle",
+      { cx: c.sx(E.d[i]), cy: c.sy(E[key][i]), r: 6.5, fill: "none", stroke: "#b3261e", "stroke-width": 2 })));
+    return c.el;
+  };
+  const gc = PF.eph_cs[cs] || [], c = chart({ h: 170, xlim: PF_XL, ylim: [0, 1.6], xlabel: "time from CS (ms)", ylabel: "SS rate ÷ baseline" });
+  c.shade(PF.early_win_ms[0], PF.early_win_ms[1], "#f6e3e1").shade(PF.pause_win_ms[0], PF.pause_win_ms[1]).hline(1).vline(0, "#bbb");
+  const leg = [];
+  gc.forEach((g, i) => { if (!g.mean) return; const x = range(g.mean.length, PF.group_t0_ms, PF.bin_ms).map(v => v + PF.bin_ms / 2);
+    if (g.sem) c.band(x, g.mean.map((m, j) => m - g.sem[j]), g.mean.map((m, j) => m + g.sem[j]), GROUP_COL[i], 0.2);
+    c.line(x, g.mean, GROUP_COL[i], { lw: 1.5 }); leg.push([`${g.label} (n ${g.n})`, GROUP_COL[i]]); });
+  c.legend(leg);
+  return el("div", { class: "card wide" }, infoIcon("Ephaptic check: "),
+    el("h3", {}, `Ephaptic check: every SS's rate after CS ${cs}, by distance`),
+    el("div", { style: "display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px" },
+      el("div", {}, el("div", { class: "note" }, `${PF.early_win_ms[0]}–${PF.early_win_ms[1]} ms ÷ baseline`), scatter("r02", "0–2 ms ÷ base")),
+      el("div", {}, el("div", { class: "note" }, `${PF.pause_win_ms[0]}–${PF.pause_win_ms[1]} ms ÷ baseline (pause window)`), scatter("r38", "3–8 ms ÷ base")),
+      el("div", {}, el("div", { class: "note" }, "non-partner SS, mean ± SEM per distance group"), c.el)),
+    el("div", { class: "note" }, `Purple: candidates of this CS (either floor) · orange: CS-flagged "SS" (carry CS spikes or CS pieces, left out of the curves) · red ring: selected SS · grey: other SS. ` +
+      `${beyond.length} SS beyond ${XM} µm not drawn (median 0–2 ms ${fmt(median(beyond.map(i => E.r02[i])))}).`));
+}
+const median = a => { const s = a.filter(v => v !== null && isFinite(v)).sort((x, y) => x - y); return s.length ? (s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2) : null; };
+const quant = (a, q) => { const s = a.filter(v => v !== null && isFinite(v)).sort((x, y) => x - y); return s.length ? s[Math.min(s.length - 1, Math.floor(q * s.length))] : null; };
+function ephapticSessionCard() {
+  if (!PF) return null;
+  const E = PF.eph, c = chart({ w: 420, h: 200, xlim: PF_XL, ylim: [0, 1.4], xlabel: "time from CS (ms)", ylabel: "SS rate ÷ baseline" });
+  c.shade(PF.early_win_ms[0], PF.early_win_ms[1], "#f6e3e1").shade(PF.pause_win_ms[0], PF.pause_win_ms[1]).hline(1).vline(0, "#bbb");
+  const leg = [];
+  PF.eph_session.forEach((g, i) => { if (!g.mean) return; const x = range(g.mean.length, PF.group_t0_ms, PF.bin_ms).map(v => v + PF.bin_ms / 2);
+    if (g.sem) c.band(x, g.mean.map((m, j) => m - g.sem[j]), g.mean.map((m, j) => m + g.sem[j]), GROUP_COL[i], 0.2);
+    c.line(x, g.mean, GROUP_COL[i], { lw: 1.5 }); leg.push([`${g.label} (n ${g.n})`, GROUP_COL[i]]); });
+  c.legend(leg);
+  const tb = el("table"); tb.append(el("tr", {}, ...["distance", "n pairs", "0–2 ms median", "IQR", "3–8 ms median", "IQR"].map(h => el("th", {}, h))));
+  const edges = [[0, 25], [25, 50], [50, 75], [75, 1e9]];
+  const add = (lab, f) => { const k = E.cs.map((_, i) => i).filter(f), a = k.map(i => E.r02[i]), b = k.map(i => E.r38[i]);
+    tb.append(el("tr", {}, el("td", {}, lab), el("td", {}, k.length), el("td", {}, fmt(median(a))), el("td", {}, `${fmt(quant(a, .25))}–${fmt(quant(a, .75))}`),
+      el("td", {}, fmt(median(b))), el("td", {}, `${fmt(quant(b, .25))}–${fmt(quant(b, .75))}`))); };
+  edges.forEach(([lo, hi], j) => add(PF.groups[j], i => !E.partner[i] && !E.flagged[i] && (E.d[i] > lo || (lo === 0 && E.d[i] === 0)) && E.d[i] <= hi));
+  add("partners (candidates)", i => E.partner[i]);
+  return el("div", { class: "card wide" }, infoIcon("Ephaptic check (session)"), el("h3", {}, "Ephaptic check (session): SS rate after any CS, by distance"),
+    el("div", { style: "display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px;align-items:start" }, c.el, el("div", { class: "table-wrap" }, tb)),
+    el("div", { class: "note" }, "All CS × SS pairs of this session; curves and groups use non-partner, non-flagged pairs. Like Han, Chen et al. 2020 Fig. 1d–e (their distance = between recording sites, ours = between peak channels)."));
+}
+
+// ---------- Duplicates ----------
+function evText(d, k) {
+  switch (k) {
+    case "coinc": return fmt(d.coinc_frac_peak);
+    case "lag_sd": return `${fmt(d.lag_sd_ms)} ms`;
+    case "union": return `${fmt(d.union_new_ratio)}×`;
+    case "ss_shared": return d.ss_shared.length ? d.ss_shared.join(",") : (d.ss_a.length && d.ss_b.length ? "different" : "–");
+    case "ss_cond": return fmt(d.ss_cond_pr_min);
+    case "footprint": return fmt(d.footprint_cos);
+    case "covar": return `${fmt(d.amp_corr_detr)} / ${fmt(d.depth_corr_detr)}`;
+  }
+}
+function renderDuplicates(M, cs) {
+  const g = el("div", { class: "grid" }); g.append(csHeader(cs));
+  const ds = dupsOf(cs);
+  if (!ds.length) { g.append(card("Duplicate evidence", el("div", { class: "note" }, "No duplicate-candidate or sharp-peak CS–CS pair involves this CS."), "wide")); M.append(g); return; }
+  if (S.pair === null || !ds.some(d => partner(d, cs) === S.pair)) S.pair = partner(ds[0], cs);
+  const d = ds.find(x => partner(x, cs) === S.pair);
+  // vote matrix
+  const tb = el("table");
+  tb.append(el("tr", {}, el("th", {}, "evidence line"), ...ds.map(x => el("th", { class: "click" + (partner(x, cs) === S.pair ? " selcol" : ""),
+    style: "cursor:pointer", onclick: () => go({ pair: partner(x, cs) }) }, `${partner(x, cs)}${x.dup_candidate ? " *" : ""}`))));
+  for (const k of EV_LINES) tb.append(el("tr", {}, el("td", { title: EV_HELP[k], style: "text-align:left" }, EV_LABELS[k] + " ⓘ"),
+    ...ds.map(x => { const v = x[`ev_${k}`]; return el("td", { class: (v > 0 ? "plus" : v < 0 ? "minus" : "zero") + (partner(x, cs) === S.pair ? " selcol" : ""),
+      style: "cursor:pointer", onclick: () => go({ pair: partner(x, cs) }) }, evText(x, k)); })));
+  tb.append(el("tr", {}, el("td", { style: "text-align:left" }, "votes"), ...ds.map(x => el("td", { class: partner(x, cs) === S.pair ? "selcol" : "" }, `+${x.n_support} / −${x.n_against}`))));
+  tb.append(el("tr", {}, el("td", { style: "text-align:left" }, "status"), ...ds.map(x => el("td", { class: partner(x, cs) === S.pair ? "selcol" : "" }, x.evidence_status.replaceAll("_", " ")))));
+  tb.append(el("tr", {}, el("td", { style: "text-align:left" }, "type"), ...ds.map(x => el("td", { class: partner(x, cs) === S.pair ? "selcol" : "" }, x.type_hint.replaceAll("_", " ").replaceAll("+", " + ")))));
+  g.append(card(`Evidence votes: CS ${cs} vs partner CS (* dup candidate; green +1 same cell, red −1 distinct, grey not testable; hover ⓘ for the rule; click a column)`,
+    el("div", { class: "table-wrap" }, tb), "wide"));
+  g.append(card(`Decision path for ${d.cs_a} / ${d.cs_b} (never an automatic merge)`, treeSvg(d), "span2"));
+  const fam = famOf(cs);
+  g.append(card("Selected pair", el("pre", { class: "card-text" }, [
+    `pair ${d.cs_a} / ${d.cs_b}   (lags: ${d.cs_b} relative to ${d.cs_a})`,
+    `pair window [${fmt(d.win_start, 0)}, ${fmt(d.win_end, 0)}] s; coinc in reference window ${fmt(d.coinc_frac_peak_ref)}`,
+    `peak lag ${fmt(d.peak_lag_ms)} ms, FWHM ${fmt(d.peak_fwhm_ms)} ms, d = ${fmt(d.dist_um, 0)} µm`,
+    `n = ${d.n_a} / ${d.n_b}: coincident ${d.n_coinc}, ${d.cs_a}-only ${d.n_a_only}, ${d.cs_b}-only ${d.n_b_only}`,
+    `SS partners: ${d.cs_a}: [${d.ss_a}]   ${d.cs_b}: [${d.ss_b}]`,
+    `union: ${d.union_new_isi} new ISIs / ${fmt(d.union_expected, 1)} expected`,
+    `doublets (ISI < ${P.DOUBLET_ISI * 1e3} ms): ${fmt(d.doublet_frac_a, 3)} / ${fmt(d.doublet_frac_b, 3)}`,
+    `ss_cond: ${d.ss_cond_detail || "–"}`, `SS after coincident: ${d.ss_coinc_pr || "–"}`,
+    `family: ${fam ? fam.join(", ") : "none"}`, ``, `status: ${d.evidence_status}`, `→ manual review; nothing is merged`].join("\n"))));
+  // template overlay at the measured lag
+  { const o = d.overlay, q = o && o.lag_q_ms;
+    const ctl = el("label", { class: "hint" }, el("input", { type: "checkbox", ...(S.osum ? { checked: "" } : {}), onchange: e => go({ osum: e.target.checked }) }), " show the sum (a + shifted b, dashed black)");
+    g.append(card(`Waveforms side by side: template ${d.cs_a} (purple) at its spike time, template ${d.cs_b} (blue) at the measured lag`,
+      el("div", {}, ctl, overlaySvg(d, S.osum), el("div", { class: "note" },
+        (q ? `${d.cs_b}'s spike time over ${o.n_lags} events within ±${P.LAG_SPREAD_WIN * 1e3} ms of the peak: median ${fmt(q[2])} ms, IQR ${fmt(q[1])}…${fmt(q[3])} ms (dark band), 10–90% ${fmt(q[0])}…${fmt(q[4])} ms (light band). ` : "") +
+        `◆a / ◆b mark each unit's peak channel. Same scale for both units (un-whitened template units). ` +
+        `A ${d.cs_b} that re-detects ${d.cs_a}'s event lines up with ${d.cs_a}'s main deflection on shared channels; a later component sits on a separate deflection at a fixed lag. ` +
+        `Sorter templates cover only ±${fmt(o ? (o.t_zero / o.sr * 1e3) : 1.4, 1)} ms around each spike, so spikelets later than that are not visible here (raw snippets would be needed).`)), "span2")); }
+  { const rd = RAW && (RAW.dups || []).find(x => x.cs_a === d.cs_a && x.cs_b === d.cs_b);
+    if (rd) g.append(dupRawCard(rd));
+    const de = dupEventsCard(d.cs_a, d.cs_b); if (de) g.append(de); }
+  // evidence panels
+  g.append(card(`Fine CCG: ${d.cs_b} relative to ${d.cs_a} (shaded: ±${P.COINC_DELTA * 1e3} ms around the peak)`, (() => {
+    const n = d.fine.length, c = chart({ xlim: [-P.FINE_WIN * 1e3, P.FINE_WIN * 1e3], ylim: [0, maxOf(d.fine) * 1.08], xlabel: "time lag (ms)", ylabel: "rate" });
+    return c.shade(d.peak_lag_ms - P.COINC_DELTA * 1e3, d.peak_lag_ms + P.COINC_DELTA * 1e3).bars(range(n, -P.FINE_WIN * 1e3, P.FINE_BIN * 1e3), d.fine, P.FINE_BIN * 1e3).el; })()));
+  g.append(card(`Lag jitter: robust SD ${fmt(d.lag_sd_ms, 3)} ms (vote ${d.ev_lag_sd})`, (() => {
+    const n = d.lag_hist.length, W = P.LAG_SPREAD_WIN * 1e3, bw = 2 * W / n;
+    return chart({ xlim: [-W, W], ylim: [0, maxOf(d.lag_hist) * 1.1], xlabel: "offset from peak lag (ms)", ylabel: "count" })
+      .bars(range(n, -W, bw), d.lag_hist, bw, "#333").el; })()));
+  g.append(card(`Rates over time (${P.DETREND_BIN} s bins): corr ${fmt(d.rate_corr_60s)}`, (() => {
+    const r = d.rates, t = r.t.map(v => v / 60), ys = [...r.a, ...r.b];
+    return chart({ xlim: [t[0], t[t.length - 1] + P.DETREND_BIN / 60], ylim: [0, maxOf(ys) * 1.1], xlabel: "time (min, imec)", ylabel: "rate (sp/s)" })
+      .step(t, r.a, P.DETREND_BIN / 60, COL.cb).step(t, r.b, P.DETREND_BIN / 60, COL.blue).step(t, r.coinc, P.DETREND_BIN / 60, "#000")
+      .legend([[`${d.cs_a}`, COL.cb], [`${d.cs_b}`, COL.blue], ["coincident", "#000"]]).el; })()));
+  g.append(dupSsCard(d));
+  g.append(card("Co-silencing: SS partner rate after each spike subset (rate / own baseline; pr = pause ratio)", (() => {
+    if (!d.cosil.length) return el("div", { class: "note" }, "No SS partner candidate for either unit: co-silencing not testable.");
+    const n = d.cosil.find(x => x.y)?.y.length || 100, W = P.COARSE_WIN * 1e3;
+    const ys = d.cosil.filter(x => x.y).flatMap(x => x.y);
+    const c = chart({ w: 680, h: 200, xlim: [-W, W], ylim: [0, Math.min(3, maxOf(ys) * 1.05)], xlabel: "time lag (ms)", ylabel: "SS rate / baseline" });
+    c.shade(P.BASELINE_WIN[0] * 1e3, P.BASELINE_WIN[1] * 1e3, COL.shade2).shade(P.PAUSE_WIN[0] * 1e3, P.PAUSE_WIN[1] * 1e3).hline(1);
+    const colors = { coincident: "#000" }; colors[`${d.cs_a}-only`] = COL.cb; colors[`${d.cs_b}-only`] = COL.blue;
+    const sss = [...new Set(d.cosil.map(x => x.ss))], leg = [];
+    d.cosil.forEach(x => { if (!x.y) return; const dash = sss.indexOf(x.ss) ? "4,3" : "";
+      c.step(range(n, -W, P.COARSE_BIN * 1e3), x.y, P.COARSE_BIN * 1e3, colors[x.subset], { dash });
+      leg.push([`SS ${x.ss} after ${x.subset} (n ${x.n}) pr ${fmt(x.pr)}`, colors[x.subset]]); });
+    const wrap = el("div", {}, c.el, el("div", { class: "note" }, leg.map(([l]) => l).join(" · ") + (sss.length > 1 ? `  (dashed: SS ${sss[1]})` : "")));
+    return wrap; })(), "span2"));
+  g.append(card(`Template footprints: overlap ${d.footprint_overlap_ch} ch, cosine ${fmt(d.footprint_cos)}`, (() => {
+    const f = d.footprint, ua = unitOf(d.cs_a), ub = unitOf(d.cs_b), y0 = (ua.y + ub.y) / 2;
+    // channels share y in pairs: plot each column of the probe as a separate line is noisy, so use the max per depth
+    const ys = [...new Set(f.y)].sort((p, q) => p - q), agg = arr => ys.map(y => Math.max(...f.y.map((v, i) => v === y ? arr[i] : -1)));
+    const A = agg(f.a), B = agg(f.b);
+    const c = chart({ h: 220, xlim: [0, 1.05], ylim: [y0 - 250, y0 + 250], xlabel: "template ptp / own max (max per depth)", ylabel: "probe y (µm)" });
+    c.line(A, ys, COL.cb, { lw: 1.6 }).line(B, ys, COL.blue, { lw: 1.6 }).legend([[`${d.cs_a}`, COL.cb], [`${d.cs_b}`, COL.blue]]);
+    if (f.overlap) c.el.append(sv("rect", { x: c.sx(0), y: c.sy(f.overlap[1]), width: c.sx(1.05) - c.sx(0), height: Math.max(0, c.sy(f.overlap[0]) - c.sy(f.overlap[1])), fill: "rgba(0,0,0,0.06)" }));
+    return el("div", {}, c.el, el("div", { class: "note" }, f.overlap ? `overlapping footprint channels between y ${f.overlap[0]} and ${f.overlap[1]} µm (shaded)` : "footprints do not overlap: not testable"));
+  })()));
+  for (const [key, lab, r] of [["amp", "amplitude", d.amp_corr_detr], ["depth", "depth", d.depth_corr_detr]]) {
+    const s = d[key];
+    if (!s) { g.append(card(`${lab} of coincident spikes`, el("div", { class: "note" }, "not available"))); continue; }
+    const lo = Math.min(minOf(s.x), minOf(s.y)), hi = Math.max(maxOf(s.x), maxOf(s.y));
+    const c = chart({ h: 220, xlim: [minOf(s.x), maxOf(s.x)], ylim: [minOf(s.y), maxOf(s.y)], xlabel: `${lab} ${d.cs_a} (detrended)`, ylabel: `${lab} ${d.cs_b} (detrended)` });
+    g.append(card(`${lab[0].toUpperCase() + lab.slice(1)} of coincident spikes, detrended: r = ${fmt(r)}`, c.dots(s.x, s.y).el));
+  }
+  M.append(g);
+}
+// CS→SS CCGs of BOTH CS of a pair with each SS partner of either (same SS, two CS), each ÷ its own baseline
+function dupSsCard(d) {
+  const a = d.cs_a, b = d.cs_b, W = 50;
+  let sss = [...new Set([...(d.ss_a || []), ...(d.ss_b || [])])], fallback = false;
+  if (!sss.length) { sss = [...new Set([curRank1(a), curRank1(b)].filter(v => v !== undefined && v !== null))]; fallback = true; }
+  if (!sss.length) return card(`CS→SS CCGs: ${a} and ${b} with the same SS`, el("div", { class: "note" }, "No SS tested for either CS."), "wide");
+  const role = (cs, ss) => (cs === a ? d.ss_a : d.ss_b).includes(ss);
+  const wrap = el("div", { style: "display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(360px,1fr))" });
+  for (const ss of sss) {
+    const lines = [], leg = [];
+    for (const [cs, col] of [[a, COL.cb], [b, COL.blue]]) {
+      const p = pairOf(cs, ss); if (!p || !p.ccg) continue;
+      const y = cropRebin(p.ccg, 1, W), n = y.length, left = range(n, -W, 1);
+      const bi = left.map((v, i) => v >= P.BASELINE_WIN[0] * 1e3 && v + 1 <= P.BASELINE_WIN[1] * 1e3 ? i : -1).filter(i => i >= 0);
+      const base = bi.reduce((s_, i) => s_ + y[i], 0) / (bi.length || 1);
+      lines.push({ cs, col, y: base > 0 ? y.map(v => v / base) : y, left, p, base });
+    }
+    const ymax = Math.min(3, Math.max(1.3, ...lines.flatMap(l => l.y)) * 1.05);
+    const c = chart({ w: 420, h: 190, xlim: [-W, W], ylim: [0, ymax], xlabel: "time after CS spike (ms)", ylabel: "SS rate / baseline" });
+    c.shade(P.BASELINE_WIN[0] * 1e3, P.BASELINE_WIN[1] * 1e3, COL.shade2).shade(P.PAUSE_WIN[0] * 1e3, P.PAUSE_WIN[1] * 1e3).hline(1).vline(0, "#bbb");
+    for (const l of lines) c.step(l.left, l.y, 1, l.col, { lw: 1.4 });
+    const u = unitOf(ss);
+    wrap.append(el("div", { class: "ccg-cell" },
+      el("div", { class: "t" }, `SS ${ss} (t${lines[0]?.p.ss_tier ?? "?"}, ${fmt(lines[0]?.p.ss_fr, 0)} sp/s, ${lines[0]?.p.ss_c4 ?? ""})` +
+        (d.ss_shared.includes(ss) ? " · partner of both" : role(a, ss) ? ` · partner of ${a} only` : role(b, ss) ? ` · partner of ${b} only` : " · rank-1 SS (no candidate)")),
+      c.el,
+      el("div", { class: "note" }, ...lines.map(l => el("div", {}, el("span", { style: `color:${l.col};font-weight:700` }, "■ "),
+        `CS ${l.cs}${l.p.candidate ? " ★" : ""}: pause ${fmt(l.p.pause_ratio)}, asym ${fmt(l.p.asym)}, jitter p ${fmt(l.p.jitter_p, 3)}, rank ${l.p.rank}, ` +
+        `${fmt(l.p.dist_um, 0)} µm, n CS ${l.p.n_cs}, baseline ${fmt(l.p.baseline_rate, 1)} sp/s, window ${fmt(l.p.win_start, 0)}–${fmt(l.p.win_end, 0)} s`)))));
+  }
+  return card(`CS→SS CCGs: CS ${a} (purple) and CS ${b} (blue) with the same SS`, el("div", {}, wrap,
+    fallback ? el("div", { class: "note" }, "Neither CS has an SS candidate: each CS's rank-1 SS is shown instead.") : null), "wide");
+}
+// are two SS partners of this CS the same cell? (ss_same_cell_check.py → window.CS_SSPAIR)
+function sameCellCard(cs) {
+  const E = window.CS_SSPAIR; if (!E) return null;
+  const list = E.pairs.filter(q => q.cs.some(c => c.cs === cs)); if (!list.length) return null;
+  const key = q => [q.ss_a, q.ss_b].sort((x, y) => x - y).join("_"), want = (S.sspair || "").split("_").map(Number).sort((x, y) => x - y).join("_");
+  const q = list.find(x => key(x) === want) || list[0], A = q.ss_a, B = q.ss_b, cA = COL.cb, cB = COL.blue;
+  const pc = v => `${fmt(100 * v, 1)}%`, md = q.median_scores;
+  const ctl = list.length > 1 ? el("div", { class: "ctl" }, el("span", { class: "hint" }, "SS pair: "),
+    ...list.map(x => el("button", { class: x === q ? "on" : "", style: x === q ? "background:var(--cb);color:#fff" : "",
+      onclick: () => go({ sspair: key(x) }) }, `${x.ss_a} – ${x.ss_b}`))) : null;
+  const floors = [...new Set(q.cs.map(c => c.cs))].map(c => `${c} (${q.cs.filter(x => x.cs === c).map(x => x.floor).join(" & ")})`).join(", ");
+  const kpi = el("div", { class: "kpi" },
+    el("div", {}, el("b", { style: q.verdict.startsWith("two") ? "" : "color:#b3261e" }, q.verdict), el("span", {}, "reading (information only)")),
+    el("div", {}, el("b", {}, `${fmt(q.zero_1ms_ratio)}×`), el("span", {}, `CCG within ±1 ms / baseline`)),
+    el("div", {}, el("b", {}, `${pc(q.frac_b_with_a)}`), el("span", {}, `of ${B} spikes with ${A} at ${fmt(q.peak_lag_ms)} ms (chance ${pc(q.chance_b_with_a)})`)),
+    el("div", {}, el("b", {}, `${fmt(md.bsig_a_without)} / ${fmt(md.bsig_random)}`), el("span", {}, `${B}-shape after ${A} spikes without ${B} / random`)),
+    el("div", {}, el("b", {}, `${fmt(md.asig_b_without)} / ${fmt(md.asig_random)}`), el("span", {}, `${A}-shape at ${B} spikes without ${A} / random`)),
+    el("div", {}, el("b", {}, `${fmt(q.dist_um, 0)} µm`), el("span", {}, `ch ${q.peak_ch_a} vs ${q.peak_ch_b}`)));
+  // CCGs
+  const fx = q.fine_x, bwf = fx[1] - fx[0], fl = fx.map(v => v - bwf / 2);
+  const c1 = chart({ w: 520, h: 190, xlim: [fl[0], fl[fl.length - 1] + bwf], ylim: [0, Math.max(...q.fine, q.base) * 1.1], xlabel: `${B} spike after ${A} spike (ms)`, ylabel: `${B} rate (sp/s)` });
+  c1.shade(q.peak_lag_ms - E.coinc_ms, q.peak_lag_ms + E.coinc_ms, "#f3d6d6").bars(fl, q.fine, bwf, "#333").hline(q.base, "#e08a2c").vline(0, "#bbb");
+  const cx = q.coarse_x, bwc = cx[1] - cx[0], cl = cx.map(v => v - bwc / 2);
+  const c2 = chart({ w: 520, h: 190, xlim: [cl[0], cl[cl.length - 1] + bwc], ylim: [0, Math.max(1.3, ...q.coarse, ...q.acg_a, ...q.acg_b) * 1.05], xlabel: "lag (ms)", ylabel: "rate / baseline" });
+  c2.hline(1).step(cl, q.acg_a, bwc, cA, { lw: 1.1 }).step(cl, q.acg_b, bwc, cB, { lw: 1.1 }).step(cl, q.coarse, bwc, "#111", { lw: 1.6 })
+    .legend([[`CCG ${A}→${B}`, "#111"], [`ACG ${A}`, cA], [`ACG ${B}`, cB]]);
+  // channel-strip means
+  const t = E.t_ms, groups = [["a_with", `${A} with ${B}`, q.n_a_with], ["a_without", `${A} without ${B}`, q.n_a_without],
+    ["b_with", `${B} with ${A}`, q.n_b_with], ["b_without", `${B} without ${A}`, q.n_b_without]];
+  const nch = q.ch.length, W = 1100, gap = 14, ml = 70, pw = (W - ml - gap * 3) / 4, rh = 22, mt = 18, H = mt + nch * rh + 32;
+  const amp = Math.max(1, ...["a_with", "a_without", "b_with", "b_without"].flatMap(g => (q.means[g] || []).map(y => Math.max(...y) - Math.min(...y))));
+  const svg = sv("svg", { width: "100%", viewBox: `0 0 ${W} ${H}` });
+  groups.forEach(([g, lab, n], k) => {
+    const px = ml + k * (pw + gap), sx = v => px + (v - t[0]) / (t[t.length - 1] - t[0]) * pw;
+    const ht = sv("text", { x: px + pw / 2, y: 11, "text-anchor": "middle", style: "font-weight:600" }); ht.textContent = `${lab} (n ${Math.min(n, E.n_ev)} of ${n})`; svg.append(ht);
+    svg.append(sv("line", { x1: sx(0), x2: sx(0), y1: mt, y2: mt + nch * rh, stroke: "#bbb", "stroke-dasharray": "2,3" }));
+    for (let c = 0; c < nch; c++) {
+      const y0 = mt + rh * (c + 0.5), col = q.ch_a.includes(q.ch[c]) ? cA : q.ch_b.includes(q.ch[c]) ? cB : "#444";
+      for (const [arr, cc, lw] of [[q.means.random, "#cfcfcf", 0.9], [q.means[g], col, 1.2]]) {
+        if (!arr) continue; let d = ""; arr[c].forEach((v, i) => d += `${i ? "L" : "M"}${sx(t[i]).toFixed(1)},${(y0 - v / amp * rh * 1.6).toFixed(1)}`);
+        svg.append(sv("path", { d, fill: "none", stroke: cc, "stroke-width": lw })); }
+      if (k === 0) { const tx = sv("text", { x: 2, y: y0 + 3, class: "muted", style: `fill:${col}` }); tx.textContent = `ch ${q.ch[c]} y ${q.ch_y[c]}`; svg.append(tx); }
+    }
+    for (const v of niceTicks(t[0], t[t.length - 1], 5)) { const yb = mt + nch * rh;
+      svg.append(sv("line", { x1: sx(v), x2: sx(v), y1: yb, y2: yb + 3, stroke: "#999" }));
+      const tx = sv("text", { x: sx(v), y: yb + 14, "text-anchor": "middle" }); tx.textContent = +v.toFixed(2); svg.append(tx); }
+  });
+  const xl = sv("text", { x: W / 2, y: H - 2, "text-anchor": "middle", class: "muted" });
+  xl.textContent = `ms from the trigger spike · common scale, largest mean peak-to-peak ${fmt(amp, 0)} µV · grey = random times`; svg.append(xl);
+  // signature histograms
+  const ed = E.hist_edges, hb = ed[1] - ed[0], hl = ed.slice(0, -1);
+  const hist = (keys, title) => { const dens = keys.map(([k]) => { const h = q.hist[k] || [], n = h.reduce((a, b) => a + b, 0) || 1; return h.map(v => v / n / hb); });
+    const c = chart({ w: 520, h: 190, xlim: [ed[0], ed[ed.length - 1]], ylim: [0, Math.max(0.5, ...dens.flat()) * 1.1], xlabel: title, ylabel: "density" });
+    c.vline(0, "#bbb").vline(1, "#bbb"); keys.forEach(([k, lab, col], i) => c.step(hl, dens[i], hb, col, { lw: 1.4 }));
+    return c.legend(keys.map(([k, lab, col]) => [`${lab} (${fmt(md[k])})`, col])).el; };
+  const h1 = hist([["bsig_a_with", `${A} with ${B}`, "#2e9c4a"], ["bsig_a_without", `${A} without ${B}`, "#d1495b"], ["bsig_a_all", `${A} all`, "#999"], ["bsig_random", "random", "#111"]],
+    `${B}'s waveform fitted at ${A} ${q.peak_lag_ms >= 0 ? "+" : "−"} ${fmt(Math.abs(q.peak_lag_ms))} ms (1 = full spike)`);
+  const h2 = hist([["asig_b_with", `${B} with ${A}`, "#2e9c4a"], ["asig_b_without", `${B} without ${A}`, "#d1495b"], ["asig_b_all", `${B} all`, "#999"], ["asig_random", "random", "#111"]],
+    `${A}'s waveform fitted at ${B} ${q.peak_lag_ms >= 0 ? "−" : "+"} ${fmt(Math.abs(q.peak_lag_ms))} ms (1 = full spike)`);
+  const row = (...xs) => el("div", { style: "display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(380px,1fr))" }, ...xs);
+  return card(`Same cell? SS ${A} (purple, ${fmt(q.fr_a, 0)} sp/s) vs SS ${B} (blue, ${fmt(q.fr_b, 0)} sp/s), both candidates of CS ${floors}`,
+    el("div", {}, ctl, kpi, row(c1.el, c2.el), svg, row(h1, h2),
+      el("div", { class: "note" }, `window ${fmt(q.window_s[0], 0)}–${fmt(q.window_s[1], 0)} s (overlap of both stable spans) · n ${q.n_a} / ${q.n_b} spikes · computed ${E.created}`)), "wide");
+}
+function treeSvg(d) {
+  const t = d.tests, W = 760, H = 370, s = sv("svg", { width: "100%", viewBox: `0 0 ${W} ${H}` });
+  const node = (x, y, lines, on, w = 210) => {
+    const h = 14 * lines.length + 10;
+    s.append(sv("rect", { x: x - w / 2, y: y - h / 2, width: w, height: h, rx: 7, fill: on ? "#ede6f6" : "#fff", stroke: on ? COL.cb : "#c8c8c8", "stroke-width": on ? 2 : 1 }));
+    lines.forEach((l, i) => { const tx = sv("text", { x, y: y - h / 2 + 17 + i * 14, "text-anchor": "middle", style: `fill:${on ? "#1d1d22" : "#9a9a9a"}` }); tx.textContent = l; s.append(tx); });
+  };
+  const edge = (x1, y1, x2, y2, lab, on) => {
+    s.append(sv("line", { x1, y1, x2, y2, stroke: on ? COL.cb : "#d0d0d0", "stroke-width": on ? 2.2 : 1, "marker-end": on ? "url(#arOn)" : "url(#arOff)" }));
+    const tx = sv("text", { x: (x1 + x2) / 2 + (x2 < x1 ? -10 : 10), y: (y1 + y2) / 2, "text-anchor": "middle", style: `fill:${on ? COL.cb : "#aaa"}` }); tx.textContent = lab; s.append(tx);
+  };
+  const defs = sv("defs");
+  for (const [id, c] of [["arOn", COL.cb], ["arOff", "#d0d0d0"]]) { const m = sv("marker", { id, viewBox: "0 0 10 10", refX: 9, refY: 5, markerWidth: 6, markerHeight: 6, orient: "auto" });
+    m.append(sv("path", { d: "M0,0L10,5L0,10Z", fill: c })); defs.append(m); }
+  s.append(defs);
+  const lsd = fmt(d.lag_sd_ms), lsd0 = P.EV_LAG_SD[0] * 1e3, lsd1 = P.EV_LAG_SD[1] * 1e3, sync = !t.tight && t.sync;
+  node(380, 22, [`pair ${d.cs_a} / ${d.cs_b}: dup candidate = ${t.candidate}  (coinc ${fmt(d.coinc_frac_peak)} at ${fmt(d.peak_lag_ms)} ms)`], true, 470);
+  node(380, 82, ["tight lock?", `lag SD ${lsd} ms ≤ ${lsd0} and coinc ≥ ${P.EV_COINC[0]}`], true, 260);
+  edge(330, 103, 200, 145, "yes", t.tight); edge(430, 103, 560, 145, "no", !t.tight);
+  node(190, 165, [`|lag| ${fmt(Math.abs(d.peak_lag_ms))} ≤ ${P.COINC_DELTA * 1e3} ms?`], t.tight, 200);
+  node(570, 165, [`lag SD ≥ ${lsd1} ms or`, "different SS partners?"], !t.tight, 200);
+  edge(150, 180, 90, 222, "yes", t.tight && t.zero_lag); edge(230, 180, 290, 222, "no", t.tight && !t.zero_lag);
+  edge(530, 180, 470, 222, "yes", sync); edge(610, 180, 670, 222, "no", !t.tight && !t.sync);
+  node(85, 245, ["same-event", "re-detection"], t.tight && t.zero_lag, 140);
+  node(290, 245, ["fixed-lag component", "(spikelet / other phase?)"], t.tight && !t.zero_lag, 170);
+  node(470, 245, ["synchrony-like", "(distinct cells?)"], sync, 140);
+  node(670, 245, ["unclear"], !t.tight && !t.sync, 110);
+  node(380, 300, [`partial-split check: ${P.EV_COINC[1]} ≤ coinc < 0.9 and (rate corr ≤ −0.3 or amp corr ≤ −${P.EV_COVAR}) → ${t.split ? "YES" : "no"}`,
+                  `rate corr ${fmt(d.rate_corr_60s)}, amp corr ${fmt(d.amp_corr_detr)}`], t.split, 600);
+  node(380, 348, [`votes +${d.n_support} (${d.support || "–"})  −${d.n_against} (${d.against || "–"})  →  ${d.evidence_status}  →  MANUAL REVIEW`], true, 700);
+  return s;
+}
+
+// ---------- Raw data (optional: raw_waveforms_session.py → ../raw_waveforms/raw_data.js) ----------
+const RAW_HUE = i => ["#3380cc", "#d1495b", "#2a9d55", "#e08a00", "#7a4fb5", "#00838f", "#8d6e63", "#c2185b"][i % 8];
+// mean waveforms laid out like the probe: one small trace per stored channel at its (x, y)
+function probeTraceSvg(u, color = COL.cb, { w = 680 } = {}) {
+  const t = RAW.meta.t_ms, xs = [...new Set(u.x)].sort((a, b) => a - b), ys = [...new Set(u.y)].sort((a, b) => b - a);
+  const cw = (w - 70) / xs.length, rh = 34, H = 16 + rh * ys.length + 24;
+  const s = sv("svg", { width: "100%", viewBox: `0 0 ${w} ${H}` });
+  const amp = Math.max(1e-9, ...u.mean.map(r => Math.max(...r) - Math.min(...r)));
+  const pk = u.ch.indexOf(u.peak), t0 = t[0], t1 = t[t.length - 1];
+  ys.forEach((y, r) => { const tx = sv("text", { x: 4, y: 16 + rh * (r + 0.5) + 3 }); tx.textContent = `y ${y}`; s.append(tx); });
+  u.ch.forEach((ch, j) => {
+    const c = xs.indexOf(u.x[j]), r = ys.indexOf(u.y[j]), x0 = 60 + c * cw, y0 = 16 + rh * (r + 0.5);
+    const sx = v => x0 + 4 + (v - t0) / (t1 - t0) * (cw - 10);
+    s.append(sv("line", { x1: sx(0), x2: sx(0), y1: y0 - rh / 2 + 2, y2: y0 + rh / 2 - 2, stroke: "#eee" }));
+    let d = ""; u.mean[j].forEach((v, i) => d += `${i ? "L" : "M"}${sx(t[i])},${y0 - v / amp * rh * 1.6}`);
+    s.append(sv("path", { d, fill: "none", stroke: j === pk ? color : "#777", "stroke-width": j === pk ? 1.6 : 0.9 }));
+  });
+  xs.forEach((x, c) => { const tx = sv("text", { x: 60 + c * cw + cw / 2, y: H - 6, "text-anchor": "middle", class: "muted" }); tx.textContent = `x ${x} µm`; s.append(tx); });
+  const cap = sv("text", { x: w - 4, y: 11, "text-anchor": "end", class: "muted" });
+  cap.textContent = `each trace ${fmt(t0, 0)}…+${fmt(t1, 0)} ms (thin line = spike time) · peak ch ${u.peak} coloured · peak-to-peak ${fmt(amp, 0)} µV`; s.append(cap);
+  return s;
+}
+// rows = channels; each row overlays several traces [{y: [...], color, lw, dash}].
+// ncol > 1 → channels laid out in columns (column-major, same depth order), one common voltage scale for all panels,
+// so a whole multi-channel mean fits on screen at once. Channel label sits above each trace.
+function rowsSvg(chs, ys, xs, rows, { w = null, rh = 52, xlim = null, marks = [], ncol = null } = {}) {
+  ncol = ncol || (rows.length > 4 ? 2 : 1);
+  w = w || (ncol > 1 ? 1100 : 680);
+  const t = RAW.meta.t_ms, gap = 26, ml = 8, mr = 8, mt = 8, nper = Math.ceil(rows.length / ncol);
+  const pw = (w - gap * (ncol - 1)) / ncol, H = mt + rh * nper + 30;
+  const s = sv("svg", { width: "100%", viewBox: `0 0 ${w} ${H}` });
+  const [t0, t1] = xlim || [t[0], t[t.length - 1]];
+  const amp = Math.max(1e-9, ...rows.flat().map(tr => Math.max(...tr.y) - Math.min(...tr.y)));
+  for (let c = 0; c < ncol; c++) {
+    const px = c * (pw + gap), sx = v => px + ml + (v - t0) / (t1 - t0) * (pw - ml - mr);
+    const sub = rows.slice(c * nper, (c + 1) * nper); if (!sub.length) continue;
+    const yb = mt + rh * sub.length;
+    for (const [v, col] of marks) s.append(sv("line", { x1: sx(v), x2: sx(v), y1: mt, y2: yb, stroke: col, "stroke-dasharray": "3,3" }));
+    s.append(sv("line", { x1: sx(0), x2: sx(0), y1: mt, y2: yb, stroke: "#bbb" }));
+    sub.forEach((traces, jj) => {
+      const j = c * nper + jj, y0 = mt + rh * (jj + 0.5);
+      if (jj) s.append(sv("line", { x1: px + ml, x2: px + pw - mr, y1: mt + rh * jj, y2: mt + rh * jj, stroke: "#f0f0f0" }));
+      const lab = sv("text", { x: px + ml + 2, y: mt + rh * jj + 11, class: "muted" }); lab.textContent = `ch ${chs[j]} · x ${xs[j]} y ${ys[j]}`; s.append(lab);
+      for (const tr of traces) { let d = "";
+        tr.y.forEach((v, i) => { if (t[i] < t0 || t[i] > t1) return; d += `${d ? "L" : "M"}${sx(t[i])},${y0 - v / amp * rh * 0.95}`; });
+        s.append(sv("path", { d, fill: "none", stroke: tr.color, "stroke-width": tr.lw || 1.2, "stroke-dasharray": tr.dash || "" })); }
+    });
+    for (const v of niceTicks(t0, t1, 10)) { s.append(sv("line", { x1: sx(v), x2: sx(v), y1: yb, y2: yb + 3, stroke: "#999" }));
+      const tx = sv("text", { x: sx(v), y: yb + 14, "text-anchor": "middle" }); tx.textContent = +v.toFixed(2); s.append(tx); }
+  }
+  const xl = sv("text", { x: w / 2, y: H - 2, "text-anchor": "middle", class: "muted" });
+  xl.textContent = `time (ms) · common scale for all channels, peak-to-peak ${fmt(amp, 0)} µV` + (ncol > 1 ? ` · channels by depth, left column first` : ""); s.append(xl);
+  return s;
+}
+function lockedSvg(k) {
+  const L = RAW.locked[k];
+  return el("div", {}, rowsSvg(L.ch, L.y, L.x, L.ch.map((_, j) => [{ y: L.other[j], color: "#888", lw: 1.4 }, { y: L.locked[j], color: "#d1495b", lw: 1.6 }])),
+    el("div", { class: "note" }, `red: CS-locked spikes (n ${L.n_locked}); grey: all other spikes (n ${L.n_other}); both at this unit's own spike time; top-${L.ch.length} channels of its mean.`));
+}
+function capRows(cs) {
+  const ag = Object.fromEntries((RAW.cs[cs]?.agree || []).map(a => [a.unit, a]));
+  return RAW.capture.filter(r => r.cs === cs).map(r => ({ ...r, ...(ag[r.unit] || {}) }));
+}
+// ---- pairing re-check (pause after the CS event window) and other raw-layer helpers ----
+const recheckOf = cs => (RAW?.recheck || []).filter(r => r.cs === cs);
+function repairInfo(cs) {          // step0 rank-1 SS vs SS with the deepest pause in 3–8 ms
+  const rs = recheckOf(cs), r1 = curRank1(cs), bp = rs.find(r => r.post_rank === 1);
+  const s0 = rs.find(r => r.ss === r1) || rs.find(r => r.step0_rank === 1);     // rank 1 of THIS step0 run
+  return { s0, bp, differs: !!(s0 && bp && s0.ss !== bp.ss && bp.pr_3_8 < 0.75) };
+}
+function rawBadges(cs) {
+  const rc = RAW.cs[cs]; if (!rc) return [];
+  const ri = repairInfo(cs), ncap = RAW.capture.filter(r => r.cs === cs).length;
+  return [el("span", { class: "badge raw", title: "raw: spikelets per event in excess of the same detector at random times · clusters capturing part of the event" }, `spk ${fmt(rc.spikelets_mean - (rc.null_mean ?? 0), 2)} · ${ncap} cap`),
+          ri.differs ? el("span", { class: "badge warn", title: `best pause after the event (3–8 ms): SS ${ri.bp.ss} (${fmt(ri.bp.pr_3_8)}) vs step0 #1 SS ${ri.s0.ss} (${fmt(ri.s0.pr_3_8)})` }, `re-pair? ${ri.bp.ss}`) : null];
+}
+function rawSummaryCard(cs) {
+  const ids = [...D.cs_ids].sort((a, b) => unitOf(a).y - unitOf(b).y);
+  const tb = el("table");
+  tb.append(el("tr", {}, ...["CS", "y µm", "events", "pol.", "detections/event", "random times", "excess spikelets", "0 det.", "capturing clusters", "top capture (excess)",
+    `step0 ${D.meta.run_tag} #1 SS (pr 0–8 / 3–8)`, "best 3–8 SS (pr 0–8 / 3–8)", ""].map(h => el("th", {}, h))));
+  for (const c of ids) {
+    const rc = RAW.cs[c]; if (!rc) continue;
+    const caps = RAW.capture.filter(r => r.cs === c).sort((a, b) => b.excess - a.excess), ri = repairInfo(c), h = rc.count_hist, n = h.reduce((a, b) => a + b, 0);
+    tb.append(el("tr", { class: "click" + (c === cs ? " sel" : ""), onclick: () => go({ cs: c, rawk: null, rawss: null }) },
+      el("td", { style: "font-weight:600" }, c), el("td", {}, fmt(unitOf(c).y, 0)), el("td", {}, rc.n_events), el("td", {}, rc.pol > 0 ? "+" : "−"), el("td", {}, fmt(rc.spikelets_mean, 2)), el("td", {}, fmt(rc.null_mean, 2)),
+      el("td", { class: rc.spikelets_mean - rc.null_mean > 0.2 ? "plus" : rc.spikelets_mean - rc.null_mean < 0.05 ? "zero" : "" }, fmt(rc.spikelets_mean - rc.null_mean, 2)),
+      el("td", {}, fmt(100 * h[0] / n, 0) + "%"),
+      el("td", {}, caps.length), el("td", {}, caps.length ? `${caps[0].unit} (${fmt(caps[0].excess)})` : "–"),
+      el("td", {}, ri.s0 ? `${ri.s0.ss} (${fmt(ri.s0.pr_0_8)} / ${fmt(ri.s0.pr_3_8)})` : "–"),
+      el("td", { class: ri.differs ? "minus" : "" }, ri.bp ? `${ri.bp.ss} (${fmt(ri.bp.pr_0_8)} / ${fmt(ri.bp.pr_3_8)})` : "–"),
+      el("td", {}, ri.differs ? "re-pair?" : "")));
+  }
+  const d = el("details", { class: "card wide" }, el("summary", {}, `All CS of the session in raw data (${Object.keys(RAW.cs).length}); click a row to switch CS`, infoIcon("All CS of the session in raw data")),
+    el("div", { class: "note" }, `Red: the SS with the deepest pause after the CS event (3–8 ms, raw layer) is not the rank-1 SS of this step0 run (${D.meta.run_tag}) and pauses clearly (< 0.75). Information only.`),
+    el("div", { class: "table-wrap" }, tb));
+  try { if (localStorage.getItem("rawSummaryOpen") !== "0") d.open = true; } catch (e) { d.open = true; }
+  d.addEventListener("toggle", () => { try { localStorage.setItem("rawSummaryOpen", d.open ? "1" : "0"); } catch (e) {} });
+  return d;
+}
+function recheckCards(g, cs) {
+  const rs = recheckOf(cs); if (!rs.length) return;
+  if (!RAW.rc_ccg?.wins?.pr_3_8) { g.append(card("Pairing re-check", el("div", { class: "note" }, "raw_data.js was built with other pause windows (before v7): rerun raw_waveforms_session.py."), "wide")); return; }
+  const C = RAW.rc_ccg, withCcg = rs.filter(r => C.y[`${cs}_${r.ss}`]);
+  if (S.rawss === null || !withCcg.some(r => r.ss === S.rawss)) S.rawss = (rs.find(r => r.post_rank === 1) || rs[0]).ss;
+  const show = [...new Map([...rs.filter(r => r.step0_rank <= 6), ...rs.filter(r => r.post_rank <= 6)].map(r => [r.ss, r])).values()]
+    .sort((a, b) => a.pr_3_8 - b.pr_3_8);
+  const tb = el("table");
+  tb.append(el("tr", {}, ...["SS", "step0 rank", "rank 3–8", "step0 cand.", "tier", "d µm", "FR", "pr 0–8 (v5)", "pr 3–8", "pr 8–16", "CS shared", "jitter p"].map(h => el("th", {}, h))));
+  const prc = v => v === null ? "zero" : v < 0.75 ? "plus" : v > 0.95 ? "minus" : "";
+  for (const r of show) tb.append(el("tr", { class: "click" + (r.ss === S.rawss ? " sel" : ""), onclick: () => go({ rawss: r.ss }) },
+    el("td", { style: "font-weight:600" }, r.ss), el("td", {}, r.step0_rank), el("td", {}, r.post_rank), el("td", {}, r.step0_candidate ? "★" : ""),
+    el("td", {}, r.ss_tier), el("td", {}, fmt(r.dist_um, 0)), el("td", {}, fmt(r.ss_fr, 0)),
+    el("td", { class: prc(r.pr_0_8) }, fmt(r.pr_0_8)), el("td", { class: prc(r.pr_3_8) }, fmt(r.pr_3_8)), el("td", { class: prc(r.pr_8_16) }, fmt(r.pr_8_16)),
+    el("td", { class: r.cs_share_excess > P.CS_SHARE_FLAG ? "minus" : "" }, fmt(r.cs_share_excess)), el("td", {}, fmt(r.jitter_p, 3))));
+  g.append(card(`Pairing re-check for CS ${cs}: pause measured after the CS event (click a row to overlay its CCG)`, el("div", { class: "table-wrap" }, tb), "span2",
+    `Computed by the raw layer from the step0 pairing it was built on (${RAW.meta.step0_dir || "see raw run.log"}). 0–8 ms = v5 window, still containing the CS event (main spike + spikelets, ≈ 0–4 ms; a unit that absorbed CS pieces gets extra spikes there and looks like a weaker pauser); ` +
+    `3–8 ms = v7 pause window (this step0 run, ${D.meta.run_tag}: ${P.PAUSE_WIN[0] * 1e3}–${P.PAUSE_WIN[1] * 1e3} ms); 8–16 ms = late, past the pause minimum. Ratios are rate / baseline (−50…−10 ms); green < 0.75, red > 0.95.`));
+  // CCG overlay: step0 #1, best 3–8, and the selected SS
+  const s0 = rs.find(r => r.step0_rank === 1), bp = rs.find(r => r.post_rank === 1);
+  const pick = [...new Set([s0?.ss, bp?.ss, S.rawss].filter(v => v !== undefined && v !== null))].filter(k => C.y[`${cs}_${k}`]);
+  const n = C.y[`${cs}_${pick[0]}`]?.length || 0, left = range(n, C.lo_ms, C.bin_ms);
+  const sm = y => y.map((_, i) => { let s = 0, k = 0; for (let j = i - 1; j <= i + 1; j++) if (j >= 0 && j < y.length) { s += y[j]; k++; } return s / k; });
+  const ys = pick.flatMap(k => sm(C.y[`${cs}_${k}`]));
+  const c = chart({ w: 680, h: 230, xlim: [C.lo_ms, C.lo_ms + n * C.bin_ms], ylim: [0, Math.min(4, maxOf(ys) * 1.05)], xlabel: "time after CS spike (ms)", ylabel: "SS rate / baseline" });
+  c.shade(C.wins.pr_0_8[0], C.wins.pr_0_8[1], COL.shade).shade(C.wins.pr_3_8[0], C.wins.pr_3_8[1], "rgba(51,128,204,0.15)").hline(1).vline(0, "#999");
+  const cols = ["#9a7bc1", "#1d1d22", "#d1495b"], leg = [];
+  pick.forEach((k, i) => { const r = rs.find(x => x.ss === k);
+    c.step(left, sm(C.y[`${cs}_${k}`]), C.bin_ms, cols[i], { lw: 1.5 });
+    leg.push([`SS ${k}${k === s0?.ss ? " (step0 #1)" : ""}${k === bp?.ss ? " (best 3–8)" : ""}: ${fmt(r.pr_0_8)} / ${fmt(r.pr_3_8)}`, cols[i]]); });
+  g.append(card(`CCGs, 0.5 ms bins (3-bin smoothed): grey = v5 pause window 0–8 ms, blue = 3–8 ms (= v7 pause window; this step0 run uses ${P.PAUSE_WIN[0] * 1e3}–${P.PAUSE_WIN[1] * 1e3} ms)`, el("div", {}, c.el,
+    el("div", { class: "note" }, ...leg.map(([l, col]) => el("span", { style: "margin-right:12px" }, el("span", { style: `color:${col};font-weight:700` }, "■ "), l)))), "span2"));
+}
+// single raw events of a CS–CS pair, one unit's spike after the other (raw_dup_events.py → window.CS_RAW_DUPEV)
+function dupEventsCard(a, b) {
+  const E = window.CS_RAW_DUPEV; if (!E) return null;
+  const d = E.pairs.find(x => (x.cs_a === a && x.cs_b === b) || (x.cs_a === b && x.cs_b === a)); if (!d) return null;
+  const F = d.first, Sd = d.second, cF = COL.cb, cS = COL.blue, t = E.t_ms, t0 = t[0], t1 = t[t.length - 1];
+  const names = ["coincident", "first-only", "second-only"].filter(k => d.sets[k]);
+  const lab = { coincident: `both (${F} then ${Sd})`, "first-only": `${F} only`, "second-only": `${Sd} only` };
+  if (!names.includes(S.dupset) && S.dupset !== "all") S.dupset = names[0];
+  const show = S.dupset === "all" ? names : [S.dupset];
+  const ctl = el("div", { class: "ctl" }, el("span", { class: "hint" }, "events: "),
+    ...[...names, "all"].map(k => el("button", { class: S.dupset === k ? "on" : "", style: S.dupset === k ? "background:var(--cb);color:#fff" : "",
+      onclick: () => go({ dupset: k }) }, k === "all" ? "all three" : `${lab[k]} (${d.sets[k].t_s.length} of ${d.sets[k].n_total})`)));
+  // rows = events (grouped by set), columns = channels
+  const rows = show.flatMap(k => d.sets[k].y.map((y, i) => ({ k, y, tt: d.sets[k].t_s[i], f: d.sets[k].first[i], s: d.sets[k].second[i] })));
+  const nch = d.ch.length, W = 1100, ml = 64, gap = 18, rh = 20, mt = 22, pw = (W - ml - gap * (nch - 1)) / nch;
+  const groupGap = 10, H = mt + rows.length * rh + groupGap * (show.length - 1) + 30;
+  const svg = sv("svg", { width: "100%", viewBox: `0 0 ${W} ${H}` });
+  // per-channel scale: median peak-to-peak over the shown events
+  const amp = d.ch.map((_, c) => { const v = rows.map(r => Math.max(...r.y[c]) - Math.min(...r.y[c])).sort((p, q) => p - q); return Math.max(1, v[Math.floor(v.length / 2)] || 1); });
+  for (let c = 0; c < nch; c++) {
+    const px = ml + c * (pw + gap), sx = v => px + (v - t0) / (t1 - t0) * pw;
+    const pk = d.ch[c] === d.peak_first && d.ch[c] === d.peak_second ? " (peak of both)" : d.ch[c] === d.peak_first ? ` (peak ${F})` : d.ch[c] === d.peak_second ? ` (peak ${Sd})` : "";
+    const ht = sv("text", { x: px + pw / 2, y: 12, "text-anchor": "middle", style: d.ch[c] === d.peak_first ? `fill:${cF};font-weight:600` : d.ch[c] === d.peak_second ? `fill:${cS};font-weight:600` : "" });
+    ht.textContent = `ch ${d.ch[c]} · y ${d.y[c]}${pk}`; svg.append(ht);
+    const yb = H - 30;
+    svg.append(sv("line", { x1: sx(0), x2: sx(0), y1: mt - 4, y2: yb, stroke: cF, "stroke-dasharray": "3,3", "stroke-opacity": 0.7 }));
+    svg.append(sv("line", { x1: sx(d.lag_ms), x2: sx(d.lag_ms), y1: mt - 4, y2: yb, stroke: cS, "stroke-dasharray": "3,3", "stroke-opacity": 0.7 }));
+    let yy = mt, prev = null;
+    rows.forEach(r => {
+      if (prev !== null && r.k !== prev) { yy += groupGap; svg.append(sv("line", { x1: px, x2: px + pw, y1: yy - groupGap / 2, y2: yy - groupGap / 2, stroke: "#bbb" })); }
+      prev = r.k; const y0 = yy + rh / 2;
+      let dd = ""; r.y[c].forEach((v, i) => dd += `${i ? "L" : "M"}${sx(t[i]).toFixed(1)},${(y0 - v / amp[c] * rh * 0.7).toFixed(1)}`);
+      svg.append(sv("path", { d: dd, fill: "none", stroke: "#333", "stroke-width": 0.8 }));
+      for (const v of r.f) svg.append(sv("line", { x1: sx(v), x2: sx(v), y1: yy + 1, y2: yy + 6, stroke: cF, "stroke-width": 2 }));
+      for (const v of r.s) svg.append(sv("line", { x1: sx(v), x2: sx(v), y1: yy + rh - 6, y2: yy + rh - 1, stroke: cS, "stroke-width": 2 }));
+      if (c === 0) { const tx = sv("text", { x: 4, y: y0 + 3, class: "muted" }); tx.textContent = `${fmt(r.tt, 1)} s`; svg.append(tx); }
+      yy += rh;
+    });
+    for (const v of niceTicks(t0, t1, 6)) { svg.append(sv("line", { x1: sx(v), x2: sx(v), y1: yb, y2: yb + 3, stroke: "#999" }));
+      const tx = sv("text", { x: sx(v), y: yb + 14, "text-anchor": "middle" }); tx.textContent = +v.toFixed(2); svg.append(tx); }
+  }
+  const xl = sv("text", { x: W / 2, y: H - 2, "text-anchor": "middle", class: "muted" });
+  xl.textContent = `time from ${F}'s spike (ms) · each channel on its own scale (median peak-to-peak ${d.ch.map((_, c) => fmt(amp[c], 0)).join(" / ")} µV)`; svg.append(xl);
+  // lag histogram of all coincident events
+  const lh = d.lag_hist, bw = 0.05, lc = chart({ w: 330, h: 140, xlim: [d.lag_hist_lo, d.lag_hist_lo + bw * lh.length], ylim: [0, maxOf(lh) * 1.1], xlabel: `${Sd}'s spike after ${F}'s (ms)`, ylabel: "events" });
+  lc.bars(range(lh.length, d.lag_hist_lo, bw), lh, bw, cS).vline(d.lag_ms, "#999");
+  const pc = v => v === null || v === undefined ? "–" : `${fmt(100 * v, 0)}%`;
+  return card(`Single raw events of CS ${F} → ${Sd}: one detection after the other`,
+    el("div", {}, el("div", { class: "kpi" },
+      el("div", {}, el("b", {}, `+${fmt(d.lag_ms)} ms`), el("span", {}, `${Sd} after ${F} (peak lag)`)),
+      el("div", {}, el("b", {}, `${d.n_coinc}`), el("span", {}, `both, of ${d.n_first} ${F} / ${d.n_second} ${Sd}`)),
+      el("div", {}, el("b", {}, pc(d.frac_repeat_first)), el("span", {}, `of 'both' events with another ${F} spike in the window`)),
+      el("div", {}, el("b", {}, pc(d.frac_repeat_second)), el("span", {}, `with another ${Sd} spike`)),
+      el("div", {}, el("b", {}, d.status.replaceAll("_", " ")), el("span", {}, "step0 status"))),
+      ctl, el("div", { style: "display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap" },
+        el("div", { style: "flex:1 1 640px;min-width:0" }, svg),
+        el("div", { style: "flex:0 0 300px" }, lc.el, el("div", { class: "note" }, `Lag of ${Sd} after ${F} in every 'both' event (±${fmt(E.coinc_delta_ms, 2)} ms around the peak lag, 0.05 ms bins).`))),
+      el("div", { class: "note" }, el("span", { style: `color:${cF};font-weight:700` }, "▮ "), `${F} spike (top tick)   `,
+        el("span", { style: `color:${cS};font-weight:700` }, "▮ "), `${Sd} spike (bottom tick)   · dashed: ${F} at 0, ${Sd} at the peak lag · rows sorted by the measured lag; left = time in the recording`)),
+    "wide");
+}
+function dupRawCard(d, { compact = false } = {}) {
+  const keys = Object.keys(d.means); if (!keys.length) return card(`Raw: ${d.cs_a} / ${d.cs_b}`, el("div", { class: "note" }, "too few events in every subset"));
+  const col = { coincident: "#1d1d22" }; col[`${d.cs_a}-only`] = COL.cb; col[`${d.cs_b}-only`] = COL.blue;
+  const rows = d.ch.map((_, j) => keys.map(k => ({ y: d.means[k][j], color: col[k], lw: k === "coincident" ? 1.7 : 1.3 })));
+  return card(`Raw means: CS ${d.cs_a} / ${d.cs_b} events split into coincident / ${d.cs_a}-only / ${d.cs_b}-only (all in ${d.cs_a}'s time frame)`,
+    el("div", {}, el("div", { class: "kpi" },
+      el("div", {}, el("b", {}, fmt(d.coinc)), el("span", {}, "coincidence")), el("div", {}, el("b", {}, `${fmt(d.lag_ms)} ms`), el("span", {}, "peak lag")),
+      el("div", {}, el("b", {}, fmt(d.cos_full)), el("span", {}, "cosine of means (all)")), el("div", {}, el("b", {}, fmt(d.cos_late)), el("span", {}, "cosine after 1.5 ms")),
+      el("div", {}, el("b", {}, d.status.replaceAll("_", " ")), el("span", {}, "step0 status"))),
+      rowsSvg(d.ch, d.y, d.x, rows, { rh: compact ? 40 : 52 }),
+      el("div", { class: "note" }, keys.map(k => el("span", { style: "margin-right:12px" }, el("span", { style: `color:${col[k]};font-weight:700` }, "■ "), `${k} (n ${d.n[k]})`)),
+        el("br"), `${d.cs_b}-only events are shifted by the peak lag so all three line up with ${d.cs_a}. Same waveform in all three → one cell seen twice (re-detection). ` +
+        `Coincident ≠ the singles (e.g. extra late component only when both fire) → the pair splits one event into pieces. Different footprints in the singles → two cells.`)),
+    "wide");
+}
+const figUrl = name => `../raw_waveforms/figures/${name}`;
+function renderRaw(M, cs) {
+  const g = el("div", { class: "grid" }); g.append(csHeader(cs));
+  const rc = RAW.cs[cs], ru = RAW.units[cs], m = RAW.meta;
+  g.append(rawSummaryCard(cs));
+  g.append(card("Raw data: source and preprocessing", el("div", { class: "note" },
+    `${m.raw_bin} (local copy) · ${m.mouse} ${m.session} · ${m.hp_hz} Hz high-pass (zero-phase), common median reference, µV · window ${m.win_ms[0]}…+${m.win_ms[1]} ms around each spike time (= template trough) · ` +
+    `means from up to ${m.n_mean} random spikes in each unit's stable span · "capturing" cluster = any cluster within 250 µm with a spike ${m.capture_win_ms[0]}…+${m.capture_win_ms[1]} ms after the CS in clearly more CS events than chance · ` +
+    `spikelets = peaks with the main spike's polarity beyond ${m.spk_thr}× the residual noise SD (event − mean, pre-CS window), prominence ≥ ${m.spk_prom ?? 2}× SD, on the CS peak channel, ${m.spk_win_ms[0]}…${m.spk_win_ms[1]} ms after the spike; the same detector on snippets at random times gives the false-positive rate · built ${m.created}`), "wide"));
+  if (!rc || !ru) { g.append(card("Raw data", el("div", { class: "note" }, "no raw data for this CS"), "wide")); M.append(g); return; }
+  const caps = capRows(cs);
+  if (!caps.some(r => r.unit === S.rawk)) S.rawk = caps.length ? caps[0].unit : null;
+  const hue = Object.fromEntries(caps.map((r, i) => [r.unit, RAW_HUE(i)]));
+  g.append(card(`Mean raw waveform of CS ${cs} (n ${ru.n}), channels within ±100 µm of its peak`, probeTraceSvg(ru), "span2"));
+  // amplitude profile along the probe
+  g.append(card("Peak-to-peak along the whole probe (each unit / its own max; max per depth)", (() => {
+    const c = chart({ h: 300, xlim: [0, 1.05], ylim: [Math.min(...ru.prof_y), Math.max(...ru.prof_y)], xlabel: "ptp / own max", ylabel: "probe y (µm)" });
+    const norm = a => { const mx = maxOf(a); return a.map(v => v / mx); };
+    c.line(norm(ru.prof_ptp), ru.prof_y, COL.cb, { lw: 1.8 });
+    const leg = [[`CS ${cs}`, COL.cb]];
+    for (const r of caps.slice(0, 7)) { const u = RAW.units[r.unit]; if (!u) continue; c.line(norm(u.prof_ptp), u.prof_y, hue[r.unit], { lw: 1 }); leg.push([`${r.unit}`, hue[r.unit]]); }
+    c.hline(unitOf(cs).y, "#bbb");
+    return el("div", {}, c.legend(leg).el, el("div", { class: "note" }, "A second bump far from the CS peak = the event is also seen there (e.g. a remote re-detection)."));
+  })()));
+  // capture table
+  const tb = el("table");
+  const cols = [["unit", "unit", 0], ["role / label", null], ["dist µm", "dist_um", 0], ["FR", "fr", 1], ["CS events with a spike", "frac_cs_events", 2],
+                ["chance", "chance", 2], ["excess", "excess", 2], ["own spikes CS-locked", "frac_unit_locked", 3], ["lag median (IQR) ms", null],
+                ["raw spikelet at that lag | fired", "raw_spikelet_if_fired", 2], ["| not fired", "raw_spikelet_if_not", 2]];
+  tb.append(el("tr", {}, ...cols.map(([h]) => el("th", {}, h))));
+  for (const r of caps) tb.append(el("tr", { class: "click" + (r.unit === S.rawk ? " sel" : ""), onclick: () => go({ rawk: r.unit }) },
+    ...cols.map(([h, k, nd]) => el("td", k === "unit" ? { style: `color:${hue[r.unit]};font-weight:600` } : {},
+      k ? fmt(r[k], nd) : h === "role / label" ? `${r.role || "–"} · ${r.group} · ${r.c4 || "unlab."}` : `${fmt(r.lag_med_ms)} (${fmt(r.lag_q25_ms)}…${fmt(r.lag_q75_ms)})`))));
+  g.append(card(`Clusters that capture part of CS ${cs}'s event (click a row to select it below)`, el("div", { class: "table-wrap" }, tb), "wide",
+    caps.length ? "Last two columns: share of CS events with a raw spikelet near this cluster's lag when the cluster fired vs when it did not. Similar values → the spikelet is there either way and the cluster catches only some of them." : "No cluster captures this CS's events above chance."));
+  // spikelet count + lag histograms
+  { const n = rc.count_hist.reduce((a, b) => a + b, 0), h = rc.count_hist.map(v => v / n);
+    const nn = (rc.null_count_hist || []).reduce((a, b) => a + b, 0) || 1, hn = (rc.null_count_hist || h.map(() => 0)).map(v => v / nn);
+    const c = chart({ xlim: [-0.5, h.length - 0.5], ylim: [0, Math.max(maxOf(h), maxOf(hn)) * 1.1], xlabel: "detections per event (6 = 6+)", ylabel: "fraction" });
+    c.bars(range(h.length, -0.4, 1), h, 0.4, COL.cb).bars(range(h.length, 0, 1), hn, 0.4, "#bbb").legend([["CS events", COL.cb], ["random times", "#bbb"]]);
+    g.append(card(`Spikelet detections per CS event: ${fmt(rc.spikelets_mean, 2)} vs ${fmt(rc.null_mean, 2)} at random times → excess ${fmt(rc.spikelets_mean - rc.null_mean, 2)}/event`, c.el, "",
+      `${rc.n_events} events, ${rc.n_null} random snippets · noise SD ${fmt(rc.noise_sd, 1)} µV · main-spike polarity ${rc.pol > 0 ? "positive" : "negative"}. Single-event counts are noisy here (background spikes on the same channel): trust the excess and the conditional means more than any single event.`)); }
+  { const h = rc.lag_hist, [e0, bw] = rc.lag_edges, c = chart({ xlim: [e0, e0 + bw * h.length], ylim: [0, maxOf(h) * 1.1], xlabel: "time after CS spike (ms)", ylabel: "spikelets" });
+    for (const r of caps) c.vline(r.lag_med_ms, hue[r.unit], "3,2");
+    c.bars(range(h.length, e0, bw), h, bw, "#333");
+    if (rc.null_lag_hist) { const sc = rc.n_events / (rc.n_null || 1); c.step(range(h.length, e0, bw), rc.null_lag_hist.map(v => v * sc), bw, "#d1495b", { lw: 1 }); }
+    g.append(card("When do raw spikelets occur? (bars: CS events; red line: random times, scaled; dashed: capturing clusters' median lags)", c.el)); }
+  // spikelets and main amplitude over the recording; amplitude by spikelet count
+  if (rc.time_min) {
+    const c = chart({ w: 680, h: 160, xlim: [Math.min(...rc.time_min), Math.max(...rc.time_min) + 1], ylim: [0, Math.max(1, maxOf(rc.cnt_t) * 1.1)], xlabel: "time (min, imec)", ylabel: "spikelets / event" });
+    const a = rc.amp_t;
+    const lo = Math.min(...a), hi = Math.max(...a), sc = v => (v - lo) / ((hi - lo) || 1) * maxOf(rc.cnt_t) * 1.05;
+    c.step(rc.time_min, a.map(sc), 1, "#bbb", { lw: 1 }).step(rc.time_min, rc.cnt_t, 1, COL.cb, { lw: 1.6 });
+    g.append(card("Spikelets per event over the recording (purple, 60 s bins); grey = median main-spike amplitude (scaled, more negative = lower)", c.el, "span2",
+      `main-spike median ${fmt(lo, 0)} … ${fmt(hi, 0)} µV. A drift in spikelet count that follows the amplitude is a recording effect, not physiology.`));
+    const ab = rc.amp_by_cnt, cc = chart({ xlim: [-0.5, 6.5], ylim: [Math.min(0, minOf(ab.filter(v => v !== null)) * 1.1), 0], xlabel: "spikelets (6 = 6+)", ylabel: "median main µV" });
+    cc.dots(range(7, 0, 1), ab, COL.cb, 3.5).line(range(7, 0, 1), ab, COL.cb);
+    g.append(card("Main-spike amplitude by spikelet count", cc.el));
+  }
+  g.append(card(`Every CS ${cs} event (heat map, sorted by spikelet count) and which capturing clusters fired in it`,
+    el("div", {}, el("img", { class: "fig", src: figUrl(`cs_${cs}_events.png`), loading: "lazy", alt: "run raw_waveforms_figures.py",
+      onerror: e => e.target.replaceWith(document.createTextNode("figure not found: run raw_waveforms_figures.py")) }),
+      el("div", { class: "figlinks" }, el("a", { href: figUrl(`cs_${cs}_events.png`), target: "_blank" }, "open full size"),
+        el("a", { href: figUrl(`cs_${cs}_summary.png`), target: "_blank" }, "summary page (PNG)"),
+        el("a", { href: figUrl(`cs_${cs}_conditional.png`), target: "_blank" }, "with/without grid (PNG)"),
+        el("a", { href: figUrl("session_summary.png"), target: "_blank" }, "session summary (PNG)"),
+        el("a", { href: figUrl("capturing_clusters_locked_vs_other.png"), target: "_blank" }, "locked vs other, all clusters (PNG)"))), "span2",
+    "Rows = events, colour = peak-channel voltage (blue negative). Each spikelet is a blue streak at a fixed lag; a column on the right is coloured when that cluster had a spike −0.5…+4 ms after the CS. A cluster whose column fills only the rows with a given spikelet is that spikelet's cluster."));
+  // single events
+  { const t = m.t_ms, k = S.rawk, mem = k !== null ? rc.single_members[k] : null;
+    const all = rc.single.flat(), lo = Math.max(minOf(all), -6 * maxOf(all)), hi = maxOf(all);
+    const c = chart({ w: 680, h: 260, xlim: [m.win_ms[0], m.win_ms[1]], ylim: [lo * 1.05, hi * 1.05], xlabel: "time after CS spike (ms)", ylabel: "µV (peak channel)" });
+    c.shade(m.spk_win_ms[0], m.spk_win_ms[1], COL.shade2);
+    rc.single.forEach((tr, i) => c.line(t, tr, mem ? (mem[i] ? hue[k] : "rgba(120,120,120,0.45)") : "rgba(90,90,90,0.4)", { lw: 0.8 }));
+    rc.single_spk.forEach((ls, i) => c.dots(ls, ls.map(v => rc.single[i][Math.min(t.length - 1, Math.max(0, Math.round((v - t[0]) * m.fs / 1000)))] ?? null), "#000", 1.8));
+    const mi = ru.ch.indexOf(rc.peak); if (mi >= 0) c.line(t, ru.mean[mi], "#000", { lw: 2 });
+    g.append(card(`${rc.single.length} single CS events on peak ch ${rc.peak} (black = mean, dots = detected spikelets)` + (k !== null ? `; coloured = cluster ${k} fired in the event window` : ""), c.el, "span2")); }
+  // conditional means for the selected cluster
+  if (S.rawk !== null) {
+    const d = rc.cond.find(x => x.unit === S.rawk), col = hue[S.rawk];
+    if (d) g.append(card(`CS ${cs} events with (colour, n ${d.n_with}) vs without (grey, n ${d.n_without}) a spike of cluster ${S.rawk}`,
+      rowsSvg(d.ch, d.y, d.x, d.ch.map((_, j) => [{ y: d.without[j], color: "#888", lw: 1.4 }, { y: d.with_[j], color: col, lw: 1.6 }]),
+        { marks: [[capRows(cs).find(r => r.unit === S.rawk).lag_med_ms, col]] }), "span2",
+      "Both at the CS spike time. If the coloured average shows an extra deflection at the cluster's lag (dashed) that the grey one lacks, the cluster takes that component only in some events; if both show it, the component is there anyway and the sorter catches only part of it."));
+    else g.append(card(`Conditional means for cluster ${S.rawk}`, el("div", { class: "note" }, "too few events on one side")));
+    if (RAW.locked[S.rawk]) g.append(card(`Cluster ${S.rawk}: its CS-locked spikes vs its other spikes`, lockedSvg(S.rawk), "span2"));
+    if (RAW.units[S.rawk]) g.append(card(`Mean raw waveform of cluster ${S.rawk} at its own spike times (n ${RAW.units[S.rawk].n})`, probeTraceSvg(RAW.units[S.rawk], col), "span2"));
+  }
+  g.append(el("details", { class: "card wide" }, el("summary", {}, `All capturing clusters of CS ${cs} at once: events with (red) vs without (grey) a spike of each cluster, peak channel`, infoIcon("All capturing clusters of CS")),
+    el("img", { class: "fig", src: figUrl(`cs_${cs}_conditional.png`), loading: "lazy", onerror: e => e.target.replaceWith(document.createTextNode("figure not found: run raw_waveforms_figures.py")) }),
+    el("div", { class: "note" }, "Black trace (shifted down) = with − without. A sharp component at the cluster's lag (dashed) = that cluster carries a piece of the CS event (spikelet or re-detection). A flat difference = the cluster just fires near CS time.")));
+  recheckCards(g, cs);
+  const dd =(RAW.dups || []).filter(d => d.cs_a === cs || d.cs_b === cs);
+  if (dd.length) {
+    if (S.rawdup === null || !dd.some(d => partner(d, cs) === S.rawdup)) S.rawdup = partner(dd[0], cs);
+    g.append(el("div", { class: "ctl wide" }, el("span", { class: "hint" }, `CS–CS pairs with ${cs} (step0 duplicate evidence): `),
+      ...dd.map(d => el("button", { class: partner(d, cs) === S.rawdup ? "on" : "", style: partner(d, cs) === S.rawdup ? "background:var(--cb);color:#fff" : "",
+        onclick: () => go({ rawdup: partner(d, cs) }) }, `${partner(d, cs)} · ${d.status.replaceAll("_", " ")}`))));
+    g.append(dupRawCard(dd.find(d => partner(d, cs) === S.rawdup)));
+    const de = dupEventsCard(cs, S.rawdup); if (de) g.append(de);
+  }
+  M.append(g);
+}
+
+// ---------- v6: CS event decomposition (spike times only) ----------
+function decompBadges(cs) {
+  const all = decompOf(cs), d = all.filter(r => r.strong); const r1 = all.find(r => r.is_rank1_ss && r.is_ss_candidate);
+  if (!d.length && !r1) return [];
+  return [!d.length ? null : el("span", { class: "badge raw", title: `${d.length} strong piece(s) of this CS's event (of ${all.length} clusters above chance): ` + d.map(r => `${r.unit} (${r.piece}, ${fmt(r.lag_med_ms, 1)} ms, excess ${fmt(r.excess)})`).join("; ") }, `pieces ×${d.length}`),
+          r1 ? el("span", { class: "badge warn", title: `rank-1 SS candidate ${r1.unit} carries pieces of this CS's event (excess ${fmt(r1.excess)}, lag ${fmt(r1.lag_med_ms, 1)} ms)` }, `SS ${r1.unit} in event`) : null];
+}
+function decompCard(cs) {
+  const all = decompOf(cs), d = S.weak ? all : all.filter(r => r.strong || r.is_ss_candidate || r.is_cs_unit);
+  if (!all.length) return card(`CS event decomposition: CS ${cs}`, el("div", { class: "note" }, `No cluster within ${P.EVENT_NEIGH_UM} µm fires inside this CS's event (${P.EVENT_WIN[0] * 1e3}…+${P.EVENT_WIN[1] * 1e3} ms) beyond chance (excess ≥ ${P.EVENT_MIN_EXCESS}).`), "wide");
+  const tb = el("table");
+  tb.append(el("tr", {}, ...["unit", "role", "group", "C4", "FR", "d µm", "events with a spike", "chance", "excess", "lag median ms (IQR)", "piece", "own spikes CS-locked", "status"].map(h => el("th", {}, h))));
+  for (const r of d) {
+    const status = [r.is_cs_unit ? "CS unit (see Duplicates)" : "", r.is_rank1_ss ? "rank-1 SS" : r.is_ss_candidate ? "SS candidate" : ""].filter(Boolean).join(", ");
+    tb.append(el("tr", { class: ((r.is_ss_candidate || r.is_cs_unit) ? "click" : "") + (r.strong ? "" : " weakrow"),
+                         onclick: r.is_cs_unit ? () => go({ tab: "duplicates", pair: r.unit }) : r.is_ss_candidate || pairOf(cs, r.unit) ? () => go({ tab: "pairing", ss: r.unit }) : null },
+      el("td", { style: "font-weight:600" }, r.unit), el("td", {}, r.role), el("td", {}, r.group), el("td", {}, r.c4), el("td", {}, fmt(r.fr, 1)), el("td", {}, fmt(r.dist_um, 0)),
+      el("td", {}, `${fmt(100 * r.frac_cs_events, 0)}% (${r.n_hit}/${r.n_cs})`), el("td", {}, fmt(100 * r.chance, 0) + "%"),
+      el("td", { class: r.excess > 0.2 ? "minus" : "" }, fmt(r.excess)),
+      el("td", {}, `${fmt(r.lag_med_ms, 2)} (${fmt(r.lag_q25_ms, 2)}…${fmt(r.lag_q75_ms, 2)})`),
+      el("td", {}, r.piece), el("td", { class: r.mostly_cs_pieces ? "minus" : "" }, fmt(100 * r.unit_locked_frac, 1) + "%"),
+      el("td", { class: r.is_ss_candidate ? "minus" : "" }, status)));
+  }
+  return card(`CS event decomposition: clusters that fire inside CS ${cs}'s event (${P.EVENT_WIN[0] * 1e3}…+${P.EVENT_WIN[1] * 1e3} ms) beyond chance`,
+    el("div", {}, el("div", { class: "ctl" }, el("label", {}, el("input", { type: "checkbox", ...(S.weak ? { checked: "" } : {}), onchange: e => go({ weak: e.target.checked }) }),
+        ` show weak pieces too (${all.length - all.filter(r => r.strong || r.is_ss_candidate || r.is_cs_unit).length} more; excess ≤ ${P.CS_EVENT_FLAG} and < ${100 * P.EVENT_LOCKED_MOST}% CS-locked)`)),
+      el("div", { class: "table-wrap" }, tb),
+      el("div", { class: "note" }, `From spike times only; nothing merged or excluded. Lag ≈ 0 (|median| ≤ ${P.EVENT_ZERO_LAG * 1e3} ms) = zero-lag copy (re-detection of the main spike); later lag = later piece (spikelet / late component). ` +
+        `Red "own spikes CS-locked" ≥ ${100 * P.EVENT_LOCKED_MOST}% = most of the cluster is CS pieces. Red status = an SS candidate of this CS that also carries pieces of its event: its pause is measured at ${P.PAUSE_WIN[0] * 1e3}–${P.PAUSE_WIN[1] * 1e3} ms, after them. ` +
+        `Chance uses the cluster's overall rate, so a unit that pauses after the CS gets a conservative (low) excess.`)), "wide");
+}
+function lowfrCard(cs) {
+  const rows = LOWFR.filter(r => r.cs === cs).sort((a, b) => a.pause_ratio - b.pause_ratio).slice(0, 6);
+  if (!rows.length) return null;
+  const tb = el("table");
+  tb.append(el("tr", {}, ...["SS (excluded)", "FR", "d µm", `pause ${P.PAUSE_WIN[0] * 1e3}–${P.PAUSE_WIN[1] * 1e3}`, "pr 0–8 (v5)", "asym", "jitter p", "CS event", "would be candidate"].map(h => el("th", {}, h))));
+  for (const r of rows) tb.append(el("tr", {}, el("td", { style: "font-weight:600" }, r.ss), el("td", {}, fmt(r.ss_fr, 1)), el("td", {}, fmt(r.dist_um, 0)),
+    el("td", { class: r.pause_ratio < P.CAND_PAUSE_RATIO_MAX ? "plus" : "" }, fmt(r.pause_ratio)), el("td", {}, fmt(r.pause_ratio_0_8)), el("td", {}, fmt(r.asym)),
+    el("td", {}, fmt(r.jitter_p, 3)), el("td", {}, fmt(r.cs_event_excess)), el("td", { class: r.would_be_candidate ? "minus" : "" }, r.would_be_candidate ? "yes" : "no")));
+  return card(`Extra-good units below the tier-1 FR floor (${P.SS1_FR_MIN} Hz): excluded, shown for audit (best 6 by pause)`, el("div", { class: "table-wrap" }, tb), "wide");
+}
+
+// ---------- Tables ----------
+function sortableTable(rows, cols, { onRow, selKey } = {}) {
+  const tb = el("table"), head = el("tr");
+  cols.forEach(c => head.append(el("th", { style: "cursor:pointer", onclick: () => { S.sortasc = S.sortk === c ? !S.sortasc : true; S.sortk = c; render(); } },
+    c + (S.sortk === c ? (S.sortasc ? " ▲" : " ▼") : ""))));
+  tb.append(head);
+  const rs = [...rows]; if (S.sortk && cols.includes(S.sortk)) rs.sort((a, b) => {
+    const x = a[S.sortk], y = b[S.sortk]; const r = (x === null) - (y === null) || (x < y ? -1 : x > y ? 1 : 0); return S.sortasc ? r : -r; });
+  rs.forEach(r => tb.append(el("tr", { class: onRow ? "click" : "", onclick: onRow ? () => onRow(r) : null },
+    ...cols.map(c => el("td", {}, Array.isArray(r[c]) ? r[c].join(",") : typeof r[c] === "number" ? fmt(r[c], Number.isInteger(r[c]) ? 0 : 3) : fmt(r[c]))))));
+  return el("div", { class: "table-wrap" }, tb);
+}
+function renderTables(M, cs) {
+  const g = el("div", { class: "grid" });
+  { const es = ephapticSessionCard(); if (es) g.append(es); }
+  if (V8) v8TablesCards(g, cs);
+  let rows = Object.values(D.pairs); if (S.tcand) rows = rows.filter(p => p.candidate); if (S.tthis) rows = rows.filter(p => p.cs === cs);
+  const pcols = ["cs", "ss", "rank", "candidate", "ss_tier", "ss_group", "ss_c4", "pause_ratio", "asym", "pause_dur50_ms", "jitter_p", "jitter_deficit",
+                 "block_pr_max", "collision_dip", "zero_peak_ratio", "lussac_pass", "cs_share_excess", "cs_share_flag",
+                 ...(V6 ? ["cs_event_excess", "ss_cs_locked_frac", "cs_event_flag", "pause_ratio_0_8", "asym_0_8"] : []), "dist_um", "ss_fr", "win_start", "win_end", "n_cs",
+                 "candidate_ref", "pause_ratio_ref", "jitter_p_ref", "n_cs_ref",
+                 ...(V8 ? ["candidate_lit", "lat_ratio", "lat_p", "lat_cliff", "refr_ratio", "below_refr_ms", "pause_isi_units", "dur_rate_ok",
+                           "lussac_paper_v1_pass", "lussac_code_main_pass", "dy_um", "far_flag", "cs_source"] : [])];
+  const ctl = el("div", { class: "ctl" },
+    el("label", {}, el("input", { type: "checkbox", ...(S.tcand ? { checked: "" } : {}), onchange: e => go({ tcand: e.target.checked }) }), " candidates only"),
+    el("label", {}, el("input", { type: "checkbox", ...(S.tthis ? { checked: "" } : {}), onchange: e => go({ tthis: e.target.checked }) }), ` CS ${cs} only`),
+    el("span", { class: "hint" }, `${rows.length} rows · click a header to sort · click a row to open it in Pairing`));
+  g.append(card("CS × SS pairs", el("div", {}, ctl, sortableTable(rows, pcols, { onRow: r => go({ tab: "pairing", cs: r.cs, ss: r.ss }) })), "wide"));
+  const dcols = ["family", "cs_a", "cs_b", "dup_candidate", "evidence_status", "type_hint", "n_support", "n_against", "support", "against",
+                 "coinc_frac_peak", "peak_lag_ms", "lag_sd_ms", "union_new_ratio", "ss_shared", "ss_cond_pr_min", "footprint_cos", "amp_corr_detr", "depth_corr_detr", "dist_um", "win_start", "win_end", "coinc_frac_peak_ref"];
+  g.append(card("CS – CS evidence (click a row to open it in Duplicates)", sortableTable(D.dups, dcols, { onRow: r => go({ tab: "duplicates", cs: r.cs_a, pair: r.cs_b }) }), "wide"));
+  if (V6) {
+    const drows = S.tthis ? decompOf(cs) : DECOMP;
+    g.append(card(`CS event decomposition (${drows.length} rows${S.tthis ? `, CS ${cs}` : ", all CS"}; click a row to open the CS)`, sortableTable(drows,
+      ["cs", "unit", "role", "group", "c4", "fr", "dist_um", "n_cs", "n_hit", "frac_cs_events", "chance", "excess", "unit_locked_frac", "lag_med_ms", "lag_q25_ms", "lag_q75_ms",
+       "piece", "mostly_cs_pieces", "is_cs_unit", "is_ss_candidate", "is_rank1_ss"], { onRow: r => go({ tab: "pairing", cs: r.cs }) }), "wide"));
+    const lrows = (S.tthis ? LOWFR.filter(r => r.cs === cs) : LOWFR).filter(r => !S.tcand || r.would_be_candidate);
+    g.append(card(`Tier-1 units below the FR floor (${P.SS1_FR_MIN} Hz), excluded (${lrows.length} rows; "candidates only" = would have been a candidate)`,
+      sortableTable(lrows, ["cs", "ss", "ss_fr", "pause_ratio", "pause_ratio_0_8", "asym", "jitter_p", "cs_event_excess", "dist_um", "would_be_candidate"]), "wide"));
+  }
+  g.append(card("Conflicts (no resolution)", sortableTable(D.conflicts, ["type", "unit", "members", "detail"]), "wide"));
+  g.append(card("Duplicate families (not merged)", el("pre", { class: "card-text" }, Object.entries(D.families).map(([k, m]) => `${k}: ${m.join(", ")}`).join("\n") || "none")));
+  g.append(card("Session", el("pre", { class: "card-text" }, JSON.stringify(D.meta, null, 1))));
+  g.append(card("Parameters used", el("pre", { class: "card-text", style: "max-height:420px;overflow:auto" }, JSON.stringify(P, null, 1)), "span2"));
+  M.append(g);
+}
+
+// ---------- render + keys ----------
+function render() {
+  document.getElementById("meta").textContent =
+    `${D.meta.mouse} ${D.meta.session_r}/${D.meta.session_s} ${D.meta.imec} · ${D.meta.sorter_type} · reference ${D.meta.window} [${D.meta.t0.toFixed(0)}, ${D.meta.t1.toFixed(0)}] s · stable spans ${D.meta.stable_span ? "on" : "off"} (behaviour ${fmt(D.meta.b0, 0)}–${fmt(D.meta.b1, 0)} s) · ${D.cs_ids.length} CS, ${D.ss_ids.length} SS candidates · built ${D.meta.created}`;
+  renderTabs(); renderList();
+  const M = document.getElementById("main"); M.innerHTML = "";
+  const cs = S.cs;
+  ({ overview: renderOverview, pairing: renderPairing, duplicates: renderDuplicates, tables: renderTables,
+     raw: RAW ? renderRaw : renderOverview }[S.tab] || renderOverview)(M, cs);
+  writeHash();
+}
+document.addEventListener("keydown", e => {
+  if (["INPUT", "SELECT", "TEXTAREA"].includes(document.activeElement.tagName)) return;
+  const rows = [...document.querySelectorAll(".cs-row")].map(r => +r.querySelector(".id").textContent);
+  const i = rows.indexOf(S.cs);
+  if (e.key === "ArrowDown" || e.key === "j") { e.preventDefault(); if (i < rows.length - 1) go({ cs: rows[i + 1], ss: null, pair: null }); }
+  if (e.key === "ArrowUp" || e.key === "k") { e.preventDefault(); if (i > 0) go({ cs: rows[i - 1], ss: null, pair: null }); }
+  if ((e.key === "ArrowRight" || e.key === "ArrowLeft") && S.tab === "pairing") {
+    const sp = shownPairs(S.cs), ps = [...sp.top, ...sp.extra.map(x => x.p)].map(p => p.ss), k = ps.indexOf(S.ss);
+    go({ ss: ps[Math.max(0, Math.min(ps.length - 1, k + (e.key === "ArrowRight" ? 1 : -1)))] });
+  }
+  if ((e.key === "ArrowRight" || e.key === "ArrowLeft") && S.tab === "duplicates") {
+    const ps = dupsOf(S.cs).map(d => partner(d, S.cs)), k = ps.indexOf(S.pair);
+    go({ pair: ps[Math.max(0, Math.min(ps.length - 1, k + (e.key === "ArrowRight" ? 1 : -1)))] });
+  }
+});
+document.getElementById("f-show").addEventListener("change", renderList);
+{ const ic = infoIcon("__sidebar"); if (ic) { ic.classList.add("inline"); document.querySelector("header h1").append(ic); } }
+document.getElementById("f-sort").addEventListener("change", renderList);
+window.addEventListener("hashchange", () => { readHash(); render(); });
+if (D) { readHash(); render(); }
+</script>
+</body>
+</html>

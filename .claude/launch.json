@@ -1,0 +1,19 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "cs-browser-R5",
+      "runtimeExecutable": "C:\\Users\\simon\\anaconda3\\envs\\teremon-cs\\python.exe",
+      "runtimeArgs": ["-m", "http.server", "8767", "--bind", "127.0.0.1", "--directory",
+                      "C:\\Users\\simon\\Desktop\\Data\\ephys_and_behavior\\CS_curation\\1_CoteDor_R5"],
+      "port": 8767
+    },
+    {
+      "name": "cs-browser-all",
+      "runtimeExecutable": "C:\\Users\\simon\\anaconda3\\envs\\teremon-cs\\python.exe",
+      "runtimeArgs": ["-m", "http.server", "8768", "--bind", "127.0.0.1", "--directory",
+                      "C:\\Users\\simon\\Desktop\\Data\\ephys_and_behavior\\CS_curation"],
+      "port": 8768
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+name: teremon-cs
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - numpy
+  - scipy
+  - pandas
+  - pyarrow
+  - h5py
+  - matplotlib
+  - pyqt
+  - ipykernel
