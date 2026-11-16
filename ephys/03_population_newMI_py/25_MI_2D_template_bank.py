@@ -68,9 +68,9 @@ SHUF_SEED_23  = 50000  # 23's seed: checked against its cache key
 N_TEST        = None   # neurons PER REGION for a test run (fixed seed); None = all
 
 # ── the template bank ────────────────────────────────────────────────────────
-COL_SIG    = (0.025, 0.05)    # (s) widths (SD) of the column templates
-DIAG_SIG   = (0.025, 0.05)    # (s) widths (SD) of the diagonal templates
-BLOB_SIG_N = (0.025, 0.05)    # (s) blob width along neural time
+COL_SIG    = (0.025, 0.05, 0.10)  # (s) widths (SD) of the column templates
+DIAG_SIG   = (0.025, 0.05, 0.10)  # (s) widths (SD) of the diagonal templates
+BLOB_SIG_N = (0.025, 0.05, 0.10)  # (s) blob width along neural time
 BLOB_SIG_K = (0.03, 0.06)     # (s) blob width along kinematic time. Keep well below
                               # the kinematic range (0.43 s, SD of a full stripe
                               # 0.124 s): wider and a blob becomes a column
@@ -622,17 +622,45 @@ if not SYNTHETIC and config.var_path(SRC_23_RES).is_file():
     with open(config.var_path(SRC_23_RES), "rb") as fh: _r23 = pickle.load(fh)
     _c23 = dict(zip(_r23["uids"], _r23["cls"]))
     C23 = np.array([_c23.get(u, "") for u in uids])
-    cls23 = [c for c in dict.fromkeys(_r23["cls"])]
-    for reg in ("CP", "CB"):
+    # 23's classes in a fixed order, the ones shared with 25 first (same columns)
+    _ord23 = ("column", "diagonal", "tiling", "broad", "not informative", "too sparse",
+              "scattered", "noise-sized", "no cluster")
+    cls23 = [c for c in _ord23 if c in set(_r23["cls"])] + \
+            [c for c in dict.fromkeys(_r23["cls"]) if c not in _ord23]
+    fig, axes = plt.subplots(1, 2, figsize=(17, 6), squeeze=False)
+    for ax, reg in zip(axes[0], ("CP", "CB")):
         m = (regions_run == reg) & (C23 != "")
-        if not m.any(): continue
+        if not m.any(): ax.axis("off"); continue
         print(f"\n{reg}: rows = 25's class, columns = 23's class (% of the row)")
         print(f"{'':16s}{'n':>6s}" + "".join(f"{c[:10]:>11s}" for c in cls23))
-        for c in CLASSES:
+        rows = [c for c in CLASSES if (m & (CLASS == c)).any()]
+        P = np.zeros((len(rows), len(cls23))); N = np.zeros_like(P, int)
+        for a, c in enumerate(rows):
             mc = m & (CLASS == c)
-            if not mc.any(): continue
-            print(f"{c:16s}{int(mc.sum()):6d}" + "".join(f"{100 * np.mean(C23[mc] == d):10.0f}%"
-                                                        for d in cls23))
+            N[a] = [int((C23[mc] == d).sum()) for d in cls23]
+            P[a] = 100 * N[a] / mc.sum()
+            print(f"{c:16s}{int(mc.sum()):6d}" + "".join(f"{v:10.0f}%" for v in P[a]))
+        same = np.array([[c == d for d in cls23] for c in rows])
+        agree = N[same].sum() / N.sum()
+        print(f"  same class in both: {100 * agree:.0f}% of {N.sum()} neurons")
+        im = ax.imshow(P, cmap="Blues", vmin=0, vmax=100, aspect="auto")
+        for a in range(len(rows)):
+            for b in range(len(cls23)):
+                if N[a, b]:
+                    ax.text(b, a, f"{P[a, b]:.0f}%\n({N[a, b]})", ha="center", va="center",
+                            fontsize=7, color="w" if P[a, b] > 55 else "k")
+                if same[a, b]:            # the cells where the two scripts agree
+                    ax.add_patch(plt.Rectangle((b - 0.5, a - 0.5), 1, 1, fill=False,
+                                               ec="tab:red", lw=2))
+        ax.set_xticks(range(len(cls23)), cls23, rotation=35, ha="right")
+        ax.set_yticks(range(len(rows)),
+                      [f"{c} ({int((m & (CLASS == c)).sum())})" for c in rows])
+        ax.set(xlabel="23's class (hot cluster)", ylabel="25's class (templates)",
+               title=f"{reg}: same class in both {100 * agree:.0f}% (n={N.sum()})")
+        plt.colorbar(im, ax=ax, label="% of the 25 class (row)")
+    fig.suptitle("STEP 7 / agreement between 25 (templates) and 23 (hot cluster); "
+                 "red boxes = same class", fontsize=10)
+    plt.tight_layout(rect=(0, 0, 1, 0.94)); _save(fig, "step7_agreement")
 elif not SYNTHETIC:
     print(f"23's results not found ({SRC_23_RES}) -- no comparison")
 

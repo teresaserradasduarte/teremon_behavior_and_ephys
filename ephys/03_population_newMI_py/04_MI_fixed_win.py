@@ -16,7 +16,7 @@ NAT2BIT = 1 / np.log(2)
 rng     = np.random.default_rng(0)
 
 # ── analysis parameters — change here only ────────────────────────────────────
-WIN_WIDTH   = 0.1       # sliding window width (s)
+WIN_WIDTH   = 0.07       # sliding window width (s)
 WIN_STEP    = 0.025       # step size (s)  →  temporal resolution of the landscape
 WIN_RANGE   = (-1.0, 1.0) # landscape range (s), re reach onset
 K_KSG       = 3           # k for KSG estimator
