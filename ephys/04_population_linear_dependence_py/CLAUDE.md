@@ -1,6 +1,6 @@
 # CLAUDE.md: granger_analysis
 
-This is a directional (Granger-style) analysis of neural–kinematic coupling, using Neuropixels recordings (CP, CB, cortex) in head-fixed mice performing a select-and-collect task. The full design is in `PLAN.md`; read it first.
+This is a directional (Granger-style) analysis of neural–kinematic coupling, using Neuropixels recordings (CP, CB, cortex) in head-fixed mice performing a select-and-collect task. The full design is in `PLAN.md`; read it first. The live checklist and open issues are in `roadmap.md`.
 
 ## Working rules
 - **Plan review before any non-trivial change.** Use plan mode, and wait for approval.
@@ -29,10 +29,22 @@ This is a directional (Granger-style) analysis of neural–kinematic coupling, u
 6. **Wording:** "predictive precedence", not "drives" or "causes". No spectral GC.
 
 ## Layout
-- `gctools/`: shared code.
-- `scripts/0X_*.py`: parameters and calls only.
-- **Data and outputs live outside the repo** (mirrors the MI project; paths in `gctools/config.py`):
-  - pkls / cache: `<MAT_DIR>/LinearDependence_py/` (cache in `python_cache/`), next to `MutualInformation_py/`.
-  - figures / tables: `<ROOT>/ephys_and_behavior/out_files/<GROUP>/group/LinearDependence/`.
-  - First folder level = lag tag (e.g. `lag150_win-375to125`), so short- and long-lag runs coexist. Keep the tag in filenames where relevant.
-- **Environment:** Python, with numpy / scipy / statsmodels. Ask before adding new dependencies.
+- `gctools/`: shared code. `tests/`: plain-assert scripts (`tests/run_tests.py` runs all).
+- `scripts/0X_*.py`: parameters and calls only. The full file list is in `PLAN.md` §1.
+- **Data and outputs live outside the repo** (mirrors the MI project; paths in `gctools/config.py`).
+  The roots (`ROOT_DIR`, `GROUP`, `MAT_DIR`) come from the MI `config.py`, loaded by file path as
+  `mi_config` (and `mi_io`), so the MI env overrides `MI_ROOT_DIR` / `MI_DATA_MAT` apply here too:
+  - pkls: `VAR_DIR = <MAT_DIR>/LinearDependence_py/`, next to `MutualInformation_py/` (`config.var_path(*parts)`).
+  - cache: `CACHE_DIR = <VAR_DIR>/python_cache/`, keyed by a parameter hash (`gctools/cache.py`).
+  - long-window kinematics: `<VAR_DIR>/reach_long/reach_long_win-3000to3000.pkl`, made by `00b`
+    (`io.load_reach_long()`).
+  - figures / tables: `OUT_DIR = <ROOT>/ephys_and_behavior/out_files/<GROUP>/group/LinearDependence/` (`config.fig_dir(*parts)`).
+  - Folder levels, under both `VAR_DIR` and `OUT_DIR`: `<LAG_TAG>/<OUT_SUBDIR>/` (figures one more level: `<RUN_NAME>/`).
+    - `LAG_TAG` (e.g. `lag150_win-375to125`, from `config.lag_tag()`), so short- and long-lag runs coexist.
+      Keep the tag in filenames where relevant.
+    - `OUT_SUBDIR` = `00_core_checks`, `01_VAR`, `02_GLM` (02 and 02a), `03_KERNELS`.
+    - `RUN_NAME` is built by `runs.data_name` from the data source, sessions and settings
+      (e.g. `real_22sessions_poissonWindows`); each run also writes `<RUN_NAME>_run_info.txt` and `_neurons.csv`.
+  - Windows paths are long: `config.long_path` / `warn_long` handle names over 259 characters.
+- **Environment:** conda env `neuro_mi` (as the MI project), with numpy / scipy / statsmodels / pandas /
+  matplotlib / joblib. Ask before adding new dependencies.

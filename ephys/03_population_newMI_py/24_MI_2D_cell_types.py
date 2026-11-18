@@ -1,6 +1,6 @@
 # %% ── 0. imports & parameters ────────────────────────────────────────────────
 # 0. cell --> parameters
-# The TIME x TIME MI maps of 12, split by CELL TYPE (CB only).
+# The TIME x TIME MI maps of 12, split by CELL TYPE (CB or CP).
 #
 # No MI is computed here. 12's cache already holds the map of EVERY neuron, so
 # this script only chooses which neurons to look at:
@@ -9,12 +9,17 @@
 #                   f(neural) and h(lag), and dR2 (diagonal vs neural time) per type
 # No CP and no CB - CP comparison: this is about the cell types of one region.
 #
-# Cell types come from the `cell_type` field of the .mat (config.DATA_MAT),
-# matched to 12's neurons by uid. mi_io does not keep that field, so it is read
-# here directly; mi_io and the parsed cache are unchanged.
-# In st_eg_neurons.mat only CB has the field:
-#   PkC_cs 351, NaN 285, MFB 249, PkC_ss 132, GoC 54, MLI 54   (1125 neurons)
-# NaN is called "unlabelled" here.
+# Cell types, matched to 12's neurons by uid, come from one of two sources (CT_SOURCE):
+#   "table"  the new cell-type table, cell_types.csv, made by
+#            02_single_neuron_analysis/cell_type_new_py (step 06): CB and CP,
+#            with the manual labels from its review GUI. Read with its loader
+#            cell_types.load_cell_types(); CT_COLUMN picks which label.
+#   "mat"    the old `cell_type` field of the .mat (config.DATA_MAT), from
+#            s04_CB_cellType.m. In st_eg_neurons.mat only CB has it:
+#            PkC_cs 351, NaN 285, MFB 249, PkC_ss 132, GoC 54, MLI 54 (1125 neurons)
+# Missing / NaN is called "unlabelled". mi_io and the parsed cache are unchanged.
+# The outputs of the two sources go to different folders / files (tag "_ctpy"
+# for the table), so the two can be compared.
 import numpy as np
 import matplotlib.pyplot as plt
 from types import SimpleNamespace
@@ -31,10 +36,19 @@ CELL_TYPES = "each"    # "each"  = every type separately, one after the other
                        #           a tuple inside the list POOLS types into one
                        #           set, e.g. ["MFB", ("PkC_ss", "PkC_cs")]
                        # None    = no split: all of the region as one set
-TYPE_REGION = "CB"     # the region whose neurons are split by type
+TYPE_REGION = "CB"     # the region whose neurons are split by type: "CB" | "CP"
+                       # ("CP" needs CT_SOURCE = "table")
+CT_SOURCE   = "table"  # "table" = new cell_types.csv | "mat" = old s04 field (CB only)
+CT_COLUMN   = "cell_type"   # table only: "cell_type" (final: manual, else automatic)
+                       # | "auto_cell_type" (automatic only) | "old_cell_type" (s04)
+CT_MIN_CONF = None     # table only: "high" = low-confidence automatic labels count
+                       # as "unlabelled" (manual labels are always kept); None = all
+CT_CODE_DIR = (config.Path(config.__file__).resolve().parents[1]      # where cell_types.py is
+               / "02_single_neuron_analysis" / "cell_type_new_py")
 MIN_TYPE_N  = 5       # a type with fewer neurons (with a map) is skipped
-DIFF_PAIRS  = [("PkC_ss", "PkC_cs")]   # cell 4b: difference maps A - B, one figure
-                       # per pair; pairs whose sets were not run are skipped
+DIFF_PAIRS  = {"CB": [("PkC_ss", "PkC_cs")],     # cell 4b: difference maps A - B, one
+               "CP": [("MSN", "FSI")]}           # figure per pair; pairs whose sets
+                                                 # were not run are skipped
 
 # ── which run of 12 to read (must match 12's settings of that run) ───────────
 FEATURES_2D  = ("x", "y", "z", "speed", "dist_water")
@@ -113,14 +127,21 @@ assert (n_kin, n_wins) == (KEY["n_kin"], KEY["n_wins"]) == EXC2.shape[1:], \
     f"grid {n_kin}x{n_wins} does not match the cache {EXC2.shape[1:]}"
 
 OUT_DIR_12 = f"{SRC_SUBDIR}_{NW_TAG}_cat{CAT_TAG}" + (f"_{SEL_TAG}" if SEL_TAG else "")
-OUT_RUN    = f"{OUT_SUBDIR}_{TYPE_REGION}_{OUT_DIR_12.replace(SRC_SUBDIR + '_', '')}"
+if CT_SOURCE not in ("table", "mat"):
+    raise ValueError(f"CT_SOURCE must be 'table' or 'mat', not {CT_SOURCE!r}")
+# which labels: "" = the old .mat field (the original names, unchanged);
+# "_ctpy" = the new table, + the column / confidence when not the defaults
+CT_TAG = "" if CT_SOURCE == "mat" else ("_ctpy"
+         + {"cell_type": "", "auto_cell_type": "auto", "old_cell_type": "old"}.get(CT_COLUMN, CT_COLUMN)
+         + ("hi" if CT_MIN_CONF == "high" else ""))
+OUT_RUN    = f"{OUT_SUBDIR}_{TYPE_REGION}{CT_TAG}_{OUT_DIR_12.replace(SRC_SUBDIR + '_', '')}"
 print(f"12's maps: {SRC.name}  ({time.time() - t0:.0f}s)")
 print(f"  {len(KEEP_12)}/{len(uids)} neurons with a map, grid {n_kin} kin x {n_wins} neural")
 print(f"  outputs -> {OUT_RUN}/")
 
 
-# %% ── 2. cell types from the .mat ───────────────────────────────────────────
-# 2. cell --> cell_type per uid, then the neuron sets.
+# %% ── 2. cell types (new table or the .mat) ─────────────────────────────────
+# 2. cell --> cell_type per uid (CT_SOURCE), then the neuron sets.
 def _cell_types(path, region):
     """-> {uid: cell_type} for every neuron of `region`, or None when its struct
     has no cell_type field. Missing / NaN / empty -> "unlabelled"."""
@@ -143,16 +164,29 @@ def _cell_types(path, region):
     return out
 
 t0 = time.time()
-CTYPE = _cell_types(config.DATA_MAT, TYPE_REGION)
-if CTYPE is None:
-    raise ValueError(f"{TYPE_REGION} has no cell_type in {config.DATA_MAT.name}")
-print(f"cell_type read from {config.DATA_MAT.name} ({time.time() - t0:.0f}s)")
+if CT_SOURCE == "table":
+    import sys
+    if str(CT_CODE_DIR) not in sys.path: sys.path.append(str(CT_CODE_DIR))
+    import cell_types
+    importlib.reload(cell_types)
+    CTYPE = cell_types.load_cell_types(TYPE_REGION, column=CT_COLUMN, min_conf=CT_MIN_CONF)
+    CT_FROM = f"{cell_types.TABLE.name} (column {CT_COLUMN}" \
+              + (", high confidence only)" if CT_MIN_CONF == "high" else ")")
+    if not CTYPE:
+        raise ValueError(f"no {TYPE_REGION} neurons in {cell_types.TABLE}")
+else:
+    CTYPE = _cell_types(config.DATA_MAT, TYPE_REGION)
+    CT_FROM = f"{config.DATA_MAT.name} (old s04 field)"
+    if CTYPE is None:
+        raise ValueError(f"{TYPE_REGION} has no cell_type in {config.DATA_MAT.name}"
+                         f" -- use CT_SOURCE = 'table'")
+print(f"cell_type read from {CT_FROM}  ({time.time() - t0:.0f}s)")
 
 # every neuron of the region with a map must have a type, or the uids do not match
 _ty = {pi: CTYPE.get(uids[pi]) for pi in KEEP_12 if regions_run[pi] == TYPE_REGION}
 _miss = [uids[pi] for pi, t in _ty.items() if t is None]
 if _miss:
-    raise ValueError(f"{len(_miss)} {TYPE_REGION} uids of 12 not found in the .mat, "
+    raise ValueError(f"{len(_miss)} {TYPE_REGION} uids of 12 not found in {CT_FROM}, "
                      f"e.g. {_miss[:3]}")
 _cnt = collections.Counter(_ty.values())
 
@@ -185,11 +219,14 @@ for name, kp in KEEP_SET.items():
     print(f"  {name:12s}{len(kp):7d}" + "".join(f"{c.get(m, 0):9d}" for m in _mice))
 
 # colours of the C4 classifier (Beau et al.), copied from npyx/c4/plots_functions.py
-# (C4_COLORS); C4 has no "unlabelled", which is grey here. A pooled set ("A+B")
-# or a type not in the table falls back to tab10.
+# (C4_COLORS); C4 has no "unlabelled", which is grey here. Striatal types use the
+# colours of the cell-type pipeline (cell_type_new_py/ct_config.COLORS). A pooled
+# set ("A+B") or any other name falls back to tab10.
 C4_COLORS = {"PkC_ss": [28, 120, 181], "PkC_cs": [0, 0, 0], "MLI": [224, 85, 159],
              "MFB": [214, 37, 41], "GrC": [143, 103, 169], "GoC": [56, 174, 62],
-             "unlabelled": [150, 150, 150]}
+             "unlabelled": [150, 150, 150],
+             "MSN": [209, 73, 91], "FSI": [0, 121, 140], "TAN": [237, 174, 73],
+             "UIN": [102, 161, 130]}
 TYPE_CLR = {n: (np.array(C4_COLORS[n]) / 255 if n in C4_COLORS else plt.cm.tab10(i % 10))
             for i, n in enumerate(KEEP_SET)}
 
@@ -204,7 +241,8 @@ ZERO_TXT = "reach endpoint"
 _XL = f"NEURAL window centre re {ZERO_TXT} (s)"
 _YL = f"KINEMATIC window centre re {ZERO_TXT} (s)"
 LAB = (f"KSG k={K_KSG}, {NEURAL_VAR}, joint [{', '.join(FEATURES_2D)}], "
-       f"cat {sorted(REACH_CAT)}{', ' + SEL_TAG if SEL_TAG else ''} — EXCESS")
+       f"cat {sorted(REACH_CAT)}{', ' + SEL_TAG if SEL_TAG else ''} — EXCESS"
+       f" — types: {'new table' + CT_TAG.replace('_ctpy', ' ') if CT_SOURCE == 'table' else 's04 .mat'}")
 
 
 def _draw(ax, M, title, vmin, vmax):
@@ -307,7 +345,7 @@ if names:
 # cells, so a type with much less MI overall (PkC_cs) does not turn the whole
 # difference one colour: red = relatively more MI in A there, blue = in B.
 from matplotlib.colors import TwoSlopeNorm
-for a, b in DIFF_PAIRS:
+for a, b in DIFF_PAIRS.get(TYPE_REGION, []):
     if a not in RES or b not in RES:
         print(f"skip {a} - {b}: not both in this run ({list(RES)})"); continue
     Ma, Mb = RES[a]["mean"], RES[b]["mean"]
@@ -417,11 +455,12 @@ if names:
 # 6. cell --> per set: its neurons, mean map and per-neuron f(neural), h(lag),
 # dR2. The maps themselves stay in 12's cache (src), not copied here.
 if SAVE_VARS and RES:
-    p = config.var_path(f"{RUN_NAME}_{TYPE_REGION}_{'-'.join(FEATURES_2D)}_{NW_TAG}"
+    p = config.var_path(f"{RUN_NAME}_{TYPE_REGION}{CT_TAG}_{'-'.join(FEATURES_2D)}_{NW_TAG}"
                         f"_ks{KIN_STEP}_cat{CAT_TAG}{'_' + SEL_TAG if SEL_TAG else ''}"
                         f"_celltypes.pkl")
     with open(p, "wb") as f:
         pickle.dump(dict(src=SRC.name, src_key=KEY, type_region=TYPE_REGION,
+                         ct_source=CT_SOURCE, ct_from=CT_FROM,
                          cell_type={uids[pi]: t for pi, t in _ty.items()},
                          sets={n: dict(types=r["types"], uids=r["uids"], mean=r["mean"],
                                        R2_neural=[r["dvn"]["R2N"][pi] for pi in r["keep"]],
